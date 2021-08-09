@@ -5,9 +5,9 @@ import subprocess as sp              #needed to run mcstas
 import argparse
 import os
 from importlib import import_module
-from mcstas_rapper import run_mcstas, run_compiler, run_instrument,
-                            valid_config, valid_mcconfig,
-                            psave, pload, load_python_instr_file
+from mcpw.mcstas_wrapper import run_mcstas, run_compiler, run_instrument,\
+                            valid_config, valid_mcconfig,\
+                            psave, pload,\
                             check_for_detector_output, get_result_path_from_input
 
 #for exeption handling
@@ -59,7 +59,9 @@ except ArgumentParserError as e:
 
 
 # importing var and mcvar from local_var.py and reseda.py files
+sys.path.append(os.getcwd())
 from local_var import variables
+
 var = variables()
 valid_config(var)
 

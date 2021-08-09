@@ -4,7 +4,7 @@ import sys                           #needed for executing this sript in diveren
 import subprocess as sp              #needed to run mcstas
 import argparse
 import os
-from setup_tools import create_local_var, create_python_file
+from mcpw.setup_tools import create_local_var, create_python_file
 
 
 

@@ -34,7 +34,7 @@ def create_local_var(args):
     class_variables_lines.append(f'        self.mcstas       = "{args.mcstas}"')
     class_variables_lines.append(f'        self.componentdir = "{args.component_dir}"')
     class_variables_lines.append(f"        #mcstas variables")
-    class_variables_lines.append(f'        self.mpi          = 2')
+    class_variables_lines.append(f'        self.mpi          = 0')
     class_variables_lines.append(f"        #additional c compiler flags")
     class_variables_lines.append(f'        self.cflags       = ""')
 
@@ -119,7 +119,7 @@ def create_python_file(args):
     class_mcvariables_lines.append('        self.dn             = "default"')
     class_mcvariables_lines.append("        self.n              = 1000000")
     class_mcvariables_lines.append(f'        self.instr_file     = "{instr_file}"  #the name of the instrument file, must be located in p_server/p_local, all custom components used by the instrument must be located in the same diretory')
-    class_mcvariables_lines.append("        self.scan           = Scan(-0.1,0.1,'A') # (begining, ending, Unit)")
+    class_mcvariables_lines.append("        self.scan           = Scan(-0.1,0.1,'A', 3) # (begining, ending, Unit, number of steps)")
     class_mcvariables_lines.append("        #variables defined in the DEFINE INSTRUMENT section of the mcstas instrument")
     for line in var_lines:
         if line.__contains__("="):
@@ -129,7 +129,7 @@ def create_python_file(args):
 
     header_lines = []
     header_lines.append(f'# import section')
-    header_lines.append(f'from mpw.mcstas_wrapper import Scan')
+    header_lines.append(f'from mcpw.mcstas_wrapper import Scan')
     header_lines.append(f'')
     header_lines.append(f'#this file must allways contain:')
     header_lines.append(f'#class mcvariables() a class containing all parameters for the mcstas instrument file')
@@ -141,10 +141,10 @@ def create_python_file(args):
     main_lines.append(f'#   your custom function  #')
     main_lines.append(f'###########################')
     main_lines.append(f'')
-    main_lines.append(f'def custom_function1(var,mcvar)')
+    main_lines.append(f'def custom_function1(var,mcvar,msg):')
     main_lines.append(f'    print("hallo world 1")')
     main_lines.append(f'')
-    main_lines.append(f'def custom_function2(var,mcvar)')
+    main_lines.append(f'def custom_function2(var,mcvar,msg):')
     main_lines.append(f'    print("hallo world 2")')
     main_lines.append(f'')
     main_lines.append(f'')
@@ -153,12 +153,12 @@ def create_python_file(args):
     main_lines.append(f'##########################################################')
     main_lines.append(f'')
     main_lines.append(f'# adding functions to post mcstas function group')
-    main_lines.append(f'def post_mcrun_funktions(var,mcvar)')
-    main_lines.append(f'    custom_function1(var,mcvar)')
+    main_lines.append(f'def post_mcrun_funktions(var,mcvar,msg):')
+    main_lines.append(f'    custom_function1(var,mcvar,msg)')
     main_lines.append(f'')
     main_lines.append(f'# adding functions to analyse function group')
-    main_lines.append(f'def post_mcrun_funktions(var,mcvar)')
-    main_lines.append(f'    custom_function2(var,mcvar)')
+    main_lines.append(f'def analyse(var,mcvar,msg):')
+    main_lines.append(f'    custom_function2(var,mcvar,msg)')
     main_lines.append(f'')
     main_lines.append(f'# end of documentation')
 

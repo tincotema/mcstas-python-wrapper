@@ -21,8 +21,9 @@ def which(program):
     if sp.run(["which", program], stdout=sp.DEVNULL, stderr=sp.DEVNULL).returncode == 1:
         sys.exit(f" '{program}' not found or is not an executable")
 
-def execute(command, errormsg, successmsg):
-    print(f"runing: {command}")
+def execute(command, errormsg, successmsg, print_command=True):
+    if print_command:
+        print(f"runing: {command}")
     run_return = sp.run(command, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE)
     # check if the process was successfully
     if run_return.returncode != 0:
@@ -86,7 +87,7 @@ def run_compiler(var,mcvar, cflags=""):
     if var.mpi == 0:
         run_string = f"nice gcc "
     else:
-        run_string = f"ncie mpicc -DUSE_MPI "
+        run_string = f"nice mpicc -DUSE_MPI "
     run_string = run_string + f"-o {var.p_local/instr_out_file} {var.p_local/instr_c_file} -lm -g -O2 -std=c99 {cflags}"
     # exectue the run_string and capture the output
     execute(run_string, "An error occurred while running the C Compiler", "C compiler done")
@@ -111,15 +112,18 @@ def run_instrument(var,mcvar):
             else:
                 params = params + f"{var_name}={var_value} "
     # scan or no scan
-    if scan_var is not []:
+    if scan_var:
         #scan
         #creating main result directory
         os.mkdir(var.p_local/var.sim_res/mcvar.dn)
         #scanning all points
+        print(f"running: {run_string} {scan_var[0]}={scan_var[1].mc} ")
         for i in range (scan_var[1].N):
+            print(f"step: {scan_var[0]}={scan_var[1].absolute_value(i)}")
             i_params = params + f"{scan_var[0]}={scan_var[1].absolute_value(i)} "
             final_run_string = run_string + f"-d {str(var.p_local/var.sim_res/mcvar.dn/str(i))} {i_params} "
-            execute(final_run_string, errormsg, successmsg)
+
+            execute(final_run_string, errormsg, successmsg, print_command=False)
     else:
         final_run_string = run_string + f"-d {str(var.p_local/var.sim_res/mcvar.dn)} {params} "
         execute(final_run_string, errormsg, successmsg)
@@ -151,7 +155,7 @@ def is_scan(mcvar):
     return False
 
 def check_for_detector_output(var, mcvar):
-    if is_scan:
+    if is_scan(mcvar):
         for i in range(mcvar.scan.N):
             if not os.path.isdir(var.p_local/var.sim_res/mcvar.dn/str(i)):
                 print(f"the mcstas output dir {mcvar.dn}/{i} dose not exist.\nexiting")
@@ -161,5 +165,26 @@ def check_for_detector_output(var, mcvar):
             print(f"the mcstas output dir {mcvar.dn} dose not exist.\n exiting")
             exit()
         else:
-            print("allfine")
+            #print("all fine")
             return
+
+def get_result_path_from_input(var, mcvar, msg, args):# logic for retreiveng the correct name for the result foulder
+    if args.func == 'analyse':
+        if args.result_dir:
+            return args.result_dir, msg
+        else:
+            d = var.p_local/var.sim_res
+            return sorted(d.iterdir(), key=os.path.getmtime, reverse=True)[0].name, msg
+    if not args.result_dir:
+        name = mcvar.dn
+    else:
+        name = args.result_dir
+    if os.path.isdir(var.p_local/var.sim_res/name):
+            counter = 0
+            new_name = name + "_" + str(counter)
+            while os.path.isdir(var.p_local/var.sim_res/new_name):
+                counter = counter + 1
+                new_name = name + "_" + str(counter)
+            msg = f'####################\n new result directory is {new_name}\n####################\n'
+            return new_name, msg
+    return name, msg
