@@ -16,7 +16,7 @@ class variables():
         #additional c compiler flags
         self.cflags      = ""
 '''
-def create_local_var(args):
+def create_local_var_lines(args):
     print("generating class variables")
     class_variables_lines = []
     class_variables_lines.append("from pathlib import Path             #needed for the path logic")
@@ -38,6 +38,10 @@ def create_local_var(args):
     class_variables_lines.append(f"        #additional c compiler flags")
     class_variables_lines.append(f'        self.cflags       = ""')
 
+    return class_variables_lines
+
+def create_local_var(args):
+    class_variables_lines = create_class_mcvariables_lines(args)
     with open(f"{args.working_dir}/local_var.py", "w") as pyfile:
         for line in class_variables_lines:
             print(line)
@@ -85,7 +89,7 @@ analyse(var,mcvar):
 
 ---------------------------------------------
 """
-def create_python_file(args):
+def check_args(args):
     if args.instrument.endswith(".instr"):
         instr_file = args.instrument
     else:
@@ -93,8 +97,10 @@ def create_python_file(args):
         exit()
     print ("reading {}".format(instr_file))
 
+
+def create_class_mcvariables_lines(args):
     var_lines = []
-    with open(instr_file) as mcfile:
+    with open(args.instrument) as mcfile:
         befor_define_section = True
         in_define_section = False
         for line in mcfile:
@@ -108,9 +114,6 @@ def create_python_file(args):
                 if (line != "(\n") and not line.startswith("DEFINE INSTRUMENT") and line !="\n" and line !=")\n":
                     var_lines.append(line.replace("\t","    ").replace("\n","").replace(","," ").replace("//","#").lstrip().split(' ',1)[1])
 
-
-
-
     print("generating class mcvariables")
     class_mcvariables_lines = []
     class_mcvariables_lines.append("class mcvariables():#class to hold the variables needed to run the mcstas simulation")
@@ -118,7 +121,7 @@ def create_python_file(args):
     class_mcvariables_lines.append("        # allways needed")
     class_mcvariables_lines.append('        self.dn             = "default"')
     class_mcvariables_lines.append("        self.n              = 1000000")
-    class_mcvariables_lines.append(f'        self.instr_file     = "{instr_file}"  #the name of the instrument file, must be located in p_server/p_local, all custom components used by the instrument must be located in the same diretory')
+    class_mcvariables_lines.append(f'        self.instr_file     = "{args.instrument}"  #the name of the instrument file, must be located in p_server/p_local')
     class_mcvariables_lines.append("        self.scan           = Scan(-0.1,0.1,'A', 3) # (begining, ending, Unit, number of steps)")
     class_mcvariables_lines.append("        #variables defined in the DEFINE INSTRUMENT section of the mcstas instrument")
     for line in var_lines:
@@ -127,6 +130,9 @@ def create_python_file(args):
         else:
             class_mcvariables_lines.append(f"        # {line}")
 
+    return class_mcvariables_lines
+
+def create_header_lines():
     header_lines = []
     header_lines.append(f'# import section')
     header_lines.append(f'from mcpw.mcstas_wrapper import Scan')
@@ -135,7 +141,9 @@ def create_python_file(args):
     header_lines.append(f'#class mcvariables() a class containing all parameters for the mcstas instrument file')
     header_lines.append(f'#def post_mcrun_funktions(var,mcvar) a funcition containing all functions that should be exectuded directly after mcstas has been executed')
     header_lines.append(f'#def analyse(var,mcvar) a funcition containing all functions that should be exectuded to analyse a finished mcstas simulation')
+    return header_lines
 
+def create_main_lines():
     main_lines = []
     main_lines.append(f'###########################')
     main_lines.append(f'#   your custom function  #')
@@ -162,6 +170,14 @@ def create_python_file(args):
     main_lines.append(f'')
     main_lines.append(f'# end of documentation')
 
+    return main_lines
+
+
+def create_python_file(args):
+    check_args(args)
+    header_lines = create_header_lines()
+    main_lines = create_main_lines()
+    class_mcvariables_lines = create_class_mcvariables_lines(args)
 
     with open(f"{args.working_dir}/{args.instrument.split('.')[0]}.py", "w") as pyfile:
         for line in header_lines:
