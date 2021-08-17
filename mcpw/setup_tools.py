@@ -41,7 +41,7 @@ def create_local_var_lines(args):
     return class_variables_lines
 
 def create_local_var(args):
-    class_variables_lines = create_class_mcvariables_lines(args)
+    class_variables_lines = create_local_var_lines(args)
     with open(f"{args.working_dir}/local_var.py", "w") as pyfile:
         for line in class_variables_lines:
             print(line)
@@ -191,6 +191,7 @@ def create_python_file(args):
         pyfile.write("\n")
         pyfile.write("\n")
         for line in main_lines:
+            print(line)
             pyfile.write("{}\n".format(line))
 
 

@@ -3,8 +3,9 @@ import subprocess as sp              #needed to run mcstas
 import sys                           #needed to select program mode of this script
 import pickle                        #needed to save mcstas variables for later use
 import os
-from os.path import isfile, isdir, isabs, dirname, basename, splitext, join, scandir
+from os.path import isfile, isdir, isabs, dirname, basename, splitext, join
 import locale
+from shutil import copyfile
 class Scan():#helping class for easyer use of the scan funktionality of mcstas, needs start and stop value and the unit of the values as well the numbers of steps
     def __init__(self, start, stop, unit, N):
         self.start = start
@@ -19,8 +20,11 @@ class Scan():#helping class for easyer use of the scan funktionality of mcstas, 
 
 def which(program):
     if os.name == 'nt':
-        if sp.run(program, stdout=sp.DEVNULL, stderr=sp.DEVNULL).returncode == 1:
-            sys.exit(f" '{program}' not found or is not an executable")
+        try:
+            if sp.run(program, stdout=sp.DEVNULL, stderr=sp.DEVNULL).returncode == 1:
+                sys.exit(f" '{program}' not found or is not an executable")
+        except Exception as e:
+            sys.exit(f"while checking ’{program}' and error accoured: {e}")
     else:
         if sp.run(["which", program], stdout=sp.DEVNULL, stderr=sp.DEVNULL).returncode == 1:
             sys.exit(f" '{program}' not found or is not an executable")
@@ -75,7 +79,7 @@ def valid_mcconfig(var,mcvar):
     else:
         # test if mpicc exists
         if os.name=='nt':
-            which("mpicc --help")
+            pass
         else:
             which("mpicc")
 
@@ -83,43 +87,54 @@ def valid_mcconfig(var,mcvar):
 def encode_files_to_local_encoding(file_or_dir_list, output_dir):
     file_list = []
     for entry in file_or_dir_list:
-        if isdir(entry):
-            with scandir(entry) as it:
-                for e in it:
-                    if e.name.endswith(['.comp','.instr','.h']) and e.is_file():
-                        file_list.append(e.path)
-        else:
-            file_list.append(entry)
+        if entry != '':
+            if isdir(entry):
+                with os.scandir(entry) as it:
+                    for e in it:
+                        if e.name.endswith(('.comp','.instr','.h')) and e.is_file():
+                            file_list.append(e.path)
+            else:
+                file_list.append(entry)
     for file in file_list:
-        of = open(file, mode='r', encoding='utf-8')
-        content = of.read()
-        of.close()
-        file_name = basename(file)
-        nf = open(f"{output_dir}/{file_name}", mode='w', encoding=locale.getpreferredencoding())
-        nf.write(content)
-        nf.close()
+        try:
+            of = open(file, mode='r', encoding='utf-8')
+            content = of.read()
+            of.close()
+            file_name = basename(file)
+            nf = open(f"{output_dir}/{file_name}", mode='w', encoding=locale.getpreferredencoding())
+            nf.write(content)
+            nf.close()
+        except UnicodeDecodeError:
+            copyfile(file, output_dir/basename(file))
+        except UnicodeEncodeError:
+            print(f' sciping {basename(file)}')
 
 # mcstas -t --verbose -o outputfile instrfile (-I componentdir)
 def run_mcstas(var, mcvar):
     # create output name
     instr_c_file = mcvar.instr_file.split('.')[0] + ".c"
+    temp_dir = 'temp_encoding'
     if os.name=='nt':
-        os.mkdir(f"{var.p_local}/temp_encoding")
-        encode_files_to_local_encoding([var.p_local/mcvar.instr_file, var.p_local, var.componentdir], f"{var.p_local}/temp_encoding")
-        run_string = f"{var.mcstas} -t --verbose -o {var.p_local/instr_c_file} {var.p_local}/temp_encoding/{basename(mcvar.instr_file)} -I {var.p_local}/local_encoding "
+        os.environ['MCSTAS'] = dirname(var.mcstas)+'/../lib/'
+        if not isdir(var.p_local/temp_dir):
+            os.mkdir(var.p_local/temp_dir)
+        encode_files_to_local_encoding([var.p_local/mcvar.instr_file, var.p_local, var.componentdir], var.p_local/temp_dir)
+        run_string = f"{var.mcstas} -t --verbose -o {var.p_local/instr_c_file} {basename(mcvar.instr_file)} -I {var.p_local/temp_dir} "
+        # exectue the run_string and capture the output
+        print(f"runing: {run_string}")
+        run_return = sp.run(run_string, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE, cwd=var.p_local/temp_dir)
+        for file in os.listdir(f"{var.p_local/temp_dir}"):
+            os.remove(f"{var.p_local/temp_dir/file}")
+        os.rmdir(f"{var.p_local/temp_dir}")
     else:
         # create run_string
         run_string = f"{var.mcstas} -t --verbose -o {var.p_local/instr_c_file} {var.p_local/mcvar.instr_file} -I {var.p_local} "
         #if a extra Component Dir is given add the option to the compile command
         if var.componentdir != "":
             run_string = run_string + f"-I {var.componentdir} "
-    # exectue the run_string and capture the output
-    print(f"runing: {run_string}")
-    run_return = sp.run(run_string, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE)
-    if os.name=='nt':
-        for file in os.listdir(f"{var.p_local}/local_encoding"):
-            os.remove(f"{var.p_local}/local_encoding/{file}")
-        os.rmdir(f"{var.p_local}/local_encoding")
+        # exectue the run_string and capture the output
+        print(f"runing: {run_string}")
+        run_return = sp.run(run_string, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE, cwd=var.p_local/temp_dir)
     # check if the process was successfull
     if run_return.returncode != 0:
         print(run_return.stdout)
@@ -131,12 +146,18 @@ def run_mcstas(var, mcvar):
 # gcc (mpicc) -o p_local/reseda.out p_local/reseda.c -lm (-DUSE_MPI) -g -O2 -lm -std=c99
 def run_compiler(var,mcvar, cflags=""):
     instr_c_file = mcvar.instr_file.split('.')[0] + ".c"
-    instr_out_file = mcvar.instr_file.split('.')[0] + ".out"
+    if os.name=='nt':
+        instr_out_file = mcvar.instr_file.split('.')[0] + ".exe"
+    else:
+        instr_out_file = mcvar.instr_file.split('.')[0] + ".out"
     #check if mpi is enabled
     if var.mpi == 0:
         run_string = f"gcc "
     else:
-        run_string = f"mpicc -DUSE_MPI "
+        if os.name=='nt':
+            run_string = f"{dirname(var.mcstas)}/mpicc.bat "
+        else:
+            run_string = f"mpicc -DUSE_MPI "
     run_string = run_string + f"-o {var.p_local/instr_out_file} {var.p_local/instr_c_file} -lm -g -O2 -std=c99 {cflags}"
     # exectue the run_string and capture the output
     execute(run_string, "An error occurred while running the C Compiler", "C compiler done")
@@ -145,15 +166,21 @@ def run_compiler(var,mcvar, cflags=""):
 def run_instrument(var,mcvar):
     errormsg = "The Simmulation Failed"
     successmsg = "The simmulation compleated successfully"
-    instr_out_file = mcvar.instr_file.split('.')[0] + ".out"
+    if os.name=='nt':
+        instr_out_file = mcvar.instr_file.split('.')[0] + ".exe"
+    else:
+        instr_out_file = mcvar.instr_file.split('.')[0] + ".out"
     params = ''
     scan_var = []
     res_list = []
     #check if mpi is enabled
-    if var.mpi == 0:
+    if var.mpi == 0 or os.name=='nt': # mcstas with mpi is broken on windows
         run_string = f"{var.p_local/instr_out_file} -n {str(mcvar.n)} "
     else:
-        run_string = f"mpirun -np {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
+        if os.name=='nt':
+            run_string = f"mpiexec -n {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
+        else:
+            run_string = f"mpirun -np {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
     # parsing the parameters and checking if a scan is required
     for var_name, var_value in mcvar.__dict__.items():
         if not (var_name in ["scan", "n", "dn", "instr_file"]):
@@ -178,16 +205,16 @@ def run_instrument(var,mcvar):
     else:
         final_run_string = run_string + f"-d {str(var.p_local/var.sim_res/mcvar.dn)} {params} "
         execute(final_run_string, errormsg, successmsg)
-        res_list.append(var.p_local/var.sim_res/mcvar.dn/str(i))
+        res_list.append(var.p_local/var.sim_res/mcvar.dn)
     return res_list
 
 def psave(obj, file_path):#saves the given object as a pickle dump in the given file (file gets created)
-    f = open(file_path, mode='xb', encoding='utf8')
+    f = open(file_path, mode='xb')
     pickle.dump(obj, f)
     f.close
 
 def pload(file_path):#funktion can read file writen by the psave function and returns its content
-    f = open(file_path, mode='rb', encoding='utf8')
+    f = open(file_path, mode='rb')
     obj = pickle.load(f)
     f.close
     return obj

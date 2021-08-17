@@ -4,6 +4,7 @@ import sys                           #needed for executing this sript in diveren
 import subprocess as sp              #needed to run mcstas
 import argparse
 import os
+import re
 from mcpw.setup_tools import create_local_var, create_python_file
 
 
@@ -34,7 +35,7 @@ def main():
     parser.add_argument('-o', '--output_dir', dest='output_dir', default='simulation_results', type=str,
                         help='name in the simulation results directory; default=simulation_results')
     parser.add_argument('-c', '--component_dir', dest='component_dir', default='', type=str,
-                        help='additional directory where mcstas will search for components; default=""')
+                        help='additional directory where mcstas will search for components needs to be a absolute path; default=""')
 
 
     #retreiveng command arguments
@@ -43,6 +44,14 @@ def main():
     except ArgumentParserError as e:
         print(e)
         exit(1)
+
+    if os.name == 'nt':
+        args.working_dir   = re.sub(r'\\','/', args.working_dir)
+        args.mcstas        = re.sub(r'\\','/', args.mcstas)
+        args.instrument    = re.sub(r'\\','/', args.instrument)
+        args.output_dir    = re.sub(r'\\','/', args.output_dir)
+        args.component_dir = re.sub(r'\\','/', args.component_dir)
+
 
     if not os.path.isfile(f"{args.working_dir}/local_var.py"):
         create_local_var(args)
