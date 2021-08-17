@@ -34,7 +34,7 @@ def create_local_var_lines(args):
     class_variables_lines.append(f'        self.mcstas       = "{args.mcstas}"')
     class_variables_lines.append(f'        self.componentdir = "{args.component_dir}"')
     class_variables_lines.append(f"        #mcstas variables")
-    class_variables_lines.append(f'        self.mpi          = 0')
+    class_variables_lines.append(f'        self.mpi          = {args.mpi}')
     class_variables_lines.append(f"        #additional c compiler flags")
     class_variables_lines.append(f'        self.cflags       = ""')
 
@@ -89,18 +89,19 @@ analyse(var,mcvar):
 
 ---------------------------------------------
 """
+import sys
+from os.path import isfile, basename
 def check_args(args):
-    if args.instrument.endswith(".instr"):
-        instr_file = args.instrument
-    else:
-        print (f"{args.instrument} dose not end on .instr")
-        exit()
-    print ("reading {}".format(instr_file))
+    if not args.instrument.endswith(".instr"):
+        sys.exit(f"{args.instrument} dose not end on .instr")
+    if not isfile(args.working_dir +'/'+ args.instrument):
+        sys.exit(f" the instrument file '{args.instrument}' is not located in the working directory '{args.working_dir}'")
 
 
-def create_class_mcvariables_lines(args):
+
+def create_class_mcvariables_lines(instrument):
     var_lines = []
-    with open(args.instrument) as mcfile:
+    with open(instrument) as mcfile:
         befor_define_section = True
         in_define_section = False
         for line in mcfile:
@@ -114,14 +115,13 @@ def create_class_mcvariables_lines(args):
                 if (line != "(\n") and not line.startswith("DEFINE INSTRUMENT") and line !="\n" and line !=")\n":
                     var_lines.append(line.replace("\t","    ").replace("\n","").replace(","," ").replace("//","#").lstrip().split(' ',1)[1])
 
-    print("generating class mcvariables")
     class_mcvariables_lines = []
     class_mcvariables_lines.append("class mcvariables():#class to hold the variables needed to run the mcstas simulation")
     class_mcvariables_lines.append("    def __init__(self):")
     class_mcvariables_lines.append("        # allways needed")
     class_mcvariables_lines.append('        self.dn             = "default"')
     class_mcvariables_lines.append("        self.n              = 1000000")
-    class_mcvariables_lines.append(f'        self.instr_file     = "{args.instrument}"  #the name of the instrument file, must be located in p_server/p_local')
+    class_mcvariables_lines.append(f'        self.instr_file     = "{basename(instrument)}"  #the name of the instrument file, must be located in p_server/p_local')
     class_mcvariables_lines.append("        self.scan           = Scan(-0.1,0.1,'A', 3) # (begining, ending, Unit, number of steps)")
     class_mcvariables_lines.append("        #variables defined in the DEFINE INSTRUMENT section of the mcstas instrument")
     for line in var_lines:
@@ -177,7 +177,8 @@ def create_python_file(args):
     check_args(args)
     header_lines = create_header_lines()
     main_lines = create_main_lines()
-    class_mcvariables_lines = create_class_mcvariables_lines(args)
+    print(f"reading {instrument}")
+    class_mcvariables_lines = create_class_mcvariables_lines(f"{args.working_dir}/{args.instrument}")
 
     with open(f"{args.working_dir}/{args.instrument.split('.')[0]}.py", "w") as pyfile:
         for line in header_lines:

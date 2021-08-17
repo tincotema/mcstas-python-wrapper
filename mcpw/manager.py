@@ -89,7 +89,7 @@ def main():
         (mcvar.dn,msg) = get_result_path_from_input(var, mcvar, msg, args) # logic for retreiveng the correct name for the result foulder
         valid_mcconfig(var,mcvar)
         if args.func == 'analyse':
-            mcvar = pload(var.p_local/var.sim_res/mcvar.dn/'variables') #loading the correct variables
+            mcvar = pload(var.sim_res/mcvar.dn/'variables') #loading the correct variables
             valid_mcconfig(var,mcvar)
             check_for_detector_output(var,mcvar)
             analyse(var, mcvar, msg)                                               #call analyse, defined in reseda.py
@@ -99,7 +99,7 @@ def main():
             run_compiler(var,mcvar)
             run_instrument(var,mcvar)
             check_for_detector_output(var,mcvar)
-            psave(mcvar, var.p_local/var.sim_res/mcvar.dn/'variables')  #save mcstas variables
+            psave(mcvar, var.sim_res/mcvar.dn/'variables')  #save mcstas variables
             post_mcrun_funktions(var, mcvar, msg) # contains functions that get executed after mcstas finished and can i.e. reformate the output
             sp.run(['tar', '-cf' '{}/{}.tar'.format(var.sim_res, mcvar.dn), var.sim_res/mcvar.dn]) #compress data
 
@@ -116,7 +116,7 @@ def main():
             run_compiler(var,mcvar)
             run_instrument(var,mcvar)
             check_for_detector_output(var,mcvar)
-            psave(mcvar, var.p_local/var.sim_res/mcvar.dn/'variables')  #save mcstas variables
+            psave(mcvar, var.sim_res/mcvar.dn/'variables')  #save mcstas variables
             post_mcrun_funktions(var, mcvar, msg) # contains functions that get executed after mcstas finished and can i.e. reformate the output
 
         elif args.func == 'full':
@@ -124,7 +124,7 @@ def main():
             run_compiler(var,mcvar)
             run_instrument(var,mcvar)
             check_for_detector_output(var,mcvar)
-            psave(mcvar, var.p_local/var.sim_res/mcvar.dn/'variables')  #save mcstas variables
+            psave(mcvar, var.sim_res/mcvar.dn/'variables')  #save mcstas variables
             post_mcrun_funktions(var, mcvar, msg) # contains functions that get executed after mcstas finished and can i.e. reformate the output
             analyse(var, mcvar, msg)                                               #call analyse, defined in reseda.py
         print(msg)

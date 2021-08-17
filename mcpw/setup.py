@@ -36,6 +36,8 @@ def main():
                         help='name in the simulation results directory; default=simulation_results')
     parser.add_argument('-c', '--component_dir', dest='component_dir', default='', type=str,
                         help='additional directory where mcstas will search for components needs to be a absolute path; default=""')
+    parser.add_argument('-M', '--MPI', dest='mpi', default=0, type=int,
+                        help='additional directory where mcstas will search for components needs to be a absolute path; default=""')
 
 
     #retreiveng command arguments
