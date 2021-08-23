@@ -2,9 +2,9 @@ import subprocess as sp              #needed to run mcstas
 import sys                           #needed to select program mode of this script
 import pickle                        #needed to save mcstas variables for later use
 import os
-from os.path import isfile, isdir, isabs, dirname, basename, splitext, join
+from os.path import isfile, isdir, isabs, dirname, basename, splitext, join, islink
 import locale
-from shutil import copyfile
+from shutil import copyfile, which
 class Scan():#helping class for easyer use of the scan funktionality of mcstas, needs start and stop value and the unit of the values as well the numbers of steps
     def __init__(self, start, stop, unit, N):
         self.start = start
@@ -16,17 +16,6 @@ class Scan():#helping class for easyer use of the scan funktionality of mcstas, 
         self.step = (stop-start) / (N-1)
     def absolute_value(self, n):
         return self.step * n + self.start
-
-def which(program):
-    if os.name == 'nt':
-        try:
-            if sp.run(program, stdout=sp.DEVNULL, stderr=sp.DEVNULL).returncode == 1:
-                sys.exit(f" '{program}' not found or is not an executable")
-        except Exception as e:
-            sys.exit(f"while checking ’{program}' and error accoured: {e}")
-    else:
-        if sp.run(["which", program], stdout=sp.DEVNULL, stderr=sp.DEVNULL).returncode == 1:
-            sys.exit(f" '{program}' not found or is not an executable")
 
 def execute(command, errormsg, successmsg, print_command=True):
     if print_command:
@@ -59,32 +48,34 @@ def valid_config(var):
     else:
         var.sim_res = var.p_local/var.sim_res
 
+    mcstas = which(var.mcstas)
+    if not mcstas:
+        sys.exit(f"\nMcStas is not installed or the Path is inocrrect: {var.mcstas}")
+    if islink(mcstas):
+        var.mcstas = os.readlink(mcstas)
+
 def valid_mcconfig(var,mcvar):
     if not mcvar.instr_file.split('.')[1] == "instr":
-        sys.exit(f"the given instrument file has not the correct ending:\
+        sys.exit(f"\nthe given instrument file has not the correct ending:\
                  \nexpected: {mcvar.instr_file.split('.')[0]}.instr\
                  \ngot: {mcvar.instr_file}\
                  \nplease make shure to give a valid instrument file")
 
     if not isfile(var.p_local/mcvar.instr_file):
-        sys.exit(f" the instrument file '{mcvar.instr_file}' dose not exist")
+        sys.exit(f"\nthe instrument file '{mcvar.instr_file}' dose not exist")
 
-    if os.name=='nt':
-        which(f"{var.mcstas} -v")
-    else:
-        which(var.mcstas)
     if var.mpi == 0:
         # test if gcc exists
-        if os.name=='nt':
-            which("gcc --help")
-        else:
-            which("gcc")
+        if not which("gcc"):
+            sys.exit(f"\ngcc is not installed. please install it")
     else:
         # test if mpicc exists
         if os.name=='nt':
-            pass
+            if not which("mpiexec"):
+                sys.exit(f"\nmpiexec is not installed. please install Microsoft MPI form the microsoft website")
         else:
-            which("mpicc")
+            if not which("mpicc"):
+                sys.exit(f"\nmpicc is not installed. please install openmpi")
 
 
 def encode_files_to_local_encoding(file_or_dir_list, output_dir):
@@ -158,7 +149,7 @@ def run_compiler(var,mcvar, cflags=""):
         run_string = f"gcc "
     else:
         if os.name=='nt':
-            run_string = f"{dirname(var.mcstas)}/mpicc.bat "
+            run_string = f"{dirname(var.mcstas)}/mpicc.bat -DUSE_MPI "
         else:
             run_string = f"mpicc -DUSE_MPI "
     run_string = run_string + f"-o {var.p_local/instr_out_file} {var.p_local/instr_c_file} -lm -g -O2 -std=c99 {cflags}"
@@ -177,11 +168,11 @@ def run_instrument(var,mcvar):
     scan_var = []
     res_list = []
     #check if mpi is enabled
-    if var.mpi == 0 or os.name=='nt': # mcstas with mpi is broken on windows
+    if var.mpi == 0:
         run_string = f"{var.p_local/instr_out_file} -n {str(mcvar.n)} "
     else:
         if os.name=='nt':
-            run_string = f"mpiexec -n {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
+            run_string = f"mpiexec -np {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
         else:
             run_string = f"mpirun -np {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
     # parsing the parameters and checking if a scan is required
@@ -271,5 +262,21 @@ def get_result_path_from_input(var, mcvar, msg, args):# logic for retreiveng the
             return new_name, msg
     return name, msg
 
+def mcplot(var,mcvar,msg='', mode=''):
+    if os.name == 'nt':
+        mcplot_dir = f"{dirname(var.mcstas)}/../lib/tools/Python/mcplot"
+    else:
+        mcplot_dir= f"{dirname(var.mcstas)}/../tools/Python/mcplot"
+    if mode == 'qt':
+        run_string= f"{mcplot_dir}/pyqtgraph/mcplot.py "
+    else:
+        run_string= f"{mcplot_dir}/matplotlib/mcplot.py "
 
+    if is_scan(mcvar):
+        print('mcplot for a Scann not jet implemented')
+        return
+    else:
+        run_string=run_string+f"{var.sim_res/mcvar.dn}"
+    print(run_string)
+    sp.run(run_string, shell=True)
 

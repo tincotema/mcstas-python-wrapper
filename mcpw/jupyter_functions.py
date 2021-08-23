@@ -11,6 +11,12 @@ from mcpw.mcstas_wrapper import run_mcstas, run_compiler,\
                                 check_for_detector_output,\
                                 psave, pload, which, valid_config
 
+def load_mcvariables(var, dn=''): # loads used parameters from simulation
+    if not dn:
+        print('no result folder name given.\n please enter one as 2nd argument to this function.')
+        return
+    return pload(var.sim_res/dn/'variables') #loading the correct variables
+
 def simulate(var, mcvar, dn='', remote=False): #spawns a simulation if dn dose not jet exists and returns a list of result dirs
     msg = ''
     if not dn:
@@ -18,7 +24,13 @@ def simulate(var, mcvar, dn='', remote=False): #spawns a simulation if dn dose n
         return
     if os.path.isdir(var.sim_res/dn):
         print('A Simulation with this result foder name allrady exists.\n Skip Simulation.')
-        return
+        res_list = []
+        if is_scan(mcvar):
+            for i in range(mcvar.scan.N):
+                res_list.append(var.sim_res/mcvar.dn/str(i))
+        else:
+            res_list.append(var.sim_res/mcvar.dn)
+        return load_mcvariables(var, dn), res_list
     else:
         mcvar.dn = dn
     #print(f'mcvar.dn={mcvar.dn}')
@@ -36,7 +48,7 @@ def simulate(var, mcvar, dn='', remote=False): #spawns a simulation if dn dose n
                 res_list.append(var.sim_res/mcvar.dn/str(i))
         else:
             res_list.append(var.sim_res/mcvar.dn)
-        return res_list
+        return mcvar, res_list
 
     else:#use this to run the script localy
         run_mcstas(var,mcvar)
@@ -47,17 +59,11 @@ def simulate(var, mcvar, dn='', remote=False): #spawns a simulation if dn dose n
         #post_mcrun_funktions(var, mcvar, msg) # contains functions that get executed after mcstas finished and can i.e. reformate the output
         print('simulation successfully\n')
 
-        return res
+        return mcvar, res
 
 def print_mcvariable_from_instrument(instrument):
     for line in create_class_mcvariables_lines(instrument):
         print(line)
-
-def load_mcvariables(var, dn=''): # loads used parameters from simulation
-    if not dn:
-        print('no result folder name given.\n please enter one as 2nd argument to this function.')
-        return
-    return pload(var.sim_res/dn/'variables') #loading the correct variables
 
 def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_dir='simulation_results', component_dir='', mpi=0):
     if os.name == 'nt':
