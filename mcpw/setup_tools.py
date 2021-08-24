@@ -177,7 +177,7 @@ def create_python_file(args):
     check_args(args)
     header_lines = create_header_lines()
     main_lines = create_main_lines()
-    print(f"reading {instrument}")
+    print(f"reading {args.instrument}")
     class_mcvariables_lines = create_class_mcvariables_lines(f"{args.working_dir}/{args.instrument}")
 
     with open(f"{args.working_dir}/{args.instrument.split('.')[0]}.py", "w") as pyfile:

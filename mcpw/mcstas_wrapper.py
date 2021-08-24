@@ -174,7 +174,7 @@ def run_instrument(var,mcvar):
         if os.name=='nt':
             run_string = f"mpiexec -np {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
         else:
-            run_string = f"mpirun -np {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
+            run_string = f"mpirun --use-hwthread-cpus -np {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
     # parsing the parameters and checking if a scan is required
     for var_name, var_value in mcvar.__dict__.items():
         if not (var_name in ["scan", "n", "dn", "instr_file"]):

@@ -20,7 +20,7 @@ class ThrowingArgumentParser(argparse.ArgumentParser):
 
 def main():
     # defining the argument parser for nice usage
-    parser= ThrowingArgumentParser(description="Script to create a python file to control a McStas Instrument with MPW")
+    parser= ThrowingArgumentParser(description="Script to create a python file to control a McStas Instrument with MCPW")
 
     subparsers = parser.add_subparsers(title="modes",
              description="Use 'manager mode --help' to view the help for any command.",
