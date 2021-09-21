@@ -4,24 +4,34 @@ import subprocess as sp              #needed to run mcstas
 import argparse
 import os
 import re
-from os.path import isdir, isfile, isabs
+from os.path import isdir, isfile, isabs, islink
 from mcpw.setup_tools import create_local_var, create_class_mcvariables_lines
 from mcpw.mcstas_wrapper import run_mcstas, run_compiler,\
                                 run_instrument, is_scan,\
                                 check_for_detector_output,\
-                                psave, pload, which, valid_config
-
+                                psave, pload, which, valid_config,\
+                                save_var_list
+from mcpw.mcstas_wrapper import load_var_list as mcpw_load_var_list
 def load_mcvariables(var, dn=''): # loads used parameters from simulation
     if not dn:
         print('no result folder name given.\n please enter one as 2nd argument to this function.')
         return
     return pload(var.sim_res/dn/'variables') #loading the correct variables
 
-def simulate(var, mcvar, dn='', remote=False): #spawns a simulation if dn dose not jet exists and returns a list of result dirs
+def load_var_list(var,mcvar):
+    try:
+        return mcpw_load_var_list(var.sim_res/mcvar.dn/'var_list')
+    except:
+        return []
+
+def simulate(var, mcvar, var_list=[], var_list_csv='', dn='', remote=False): #spawns a simulation if dn dose not jet exists and returns a list of result dirs
     msg = ''
+    #checking for imput
     if not dn:
         print('no result folder name given.\n please enter one as 4th argument to this function.')
         return
+
+    # checking if the result folder exists and if yes, load mcvariables and create output list
     if os.path.isdir(var.sim_res/dn):
         print('A Simulation with this result foder name allrady exists.\n Skip Simulation.')
         res_list = []
@@ -33,8 +43,25 @@ def simulate(var, mcvar, dn='', remote=False): #spawns a simulation if dn dose n
         return load_mcvariables(var, dn), res_list
     else:
         mcvar.dn = dn
-    #print(f'mcvar.dn={mcvar.dn}')
-    if remote:#use this if you want to run the simulation on a remote machine (setup has to be done beforhand)
+
+    # check if var_list or var_list file is given.
+    if var_list_csv and not var_list:
+        if not isabs(var_list_csv):
+            if not isfile(var.p_local/var_list_csv):
+                sys.exit(f"could not find {var_list_csv} in {var.p_local}")
+        else:
+            if not isfile(var.p_local/var_list_csv):
+                sys.exit(f"could not find {var_list_csv}")
+        try:
+            if isabs(var_list_csv):
+                var_list = mcpw_load_var_list(var_list_csv)
+            else:
+                var_list = mcpw_load_var_list(var.p_local/var_list_csv)
+        except Exception as e:
+            sys.exit(f"could not import {var_list_csv}. an exception occurred:\n{e}")
+
+    # if remote simulation is True (setup has to be done beforhand)
+    if remote:
         sp.run(['scp', '-r', '-P', str(var.port), var.instr_file, '{}:{}'.format(var.server, var.p_server)])#copy mcstas-instrument to remote
         sp.run(['scp', '-r', '-P', str(var.port), 'manager.py', '{}:{}'.format(var.server, var.p_server)])#copy this file to remote
         sp.run(['scp', '-r', '-P', str(var.port), 'reseda.py', '{}:{}'.format(var.server, var.p_server)])#copy this file to remote
@@ -50,22 +77,25 @@ def simulate(var, mcvar, dn='', remote=False): #spawns a simulation if dn dose n
             res_list.append(var.sim_res/mcvar.dn)
         return mcvar, res_list
 
-    else:#use this to run the script localy
+    # run the script localy
+    else:
         run_mcstas(var,mcvar)
         run_compiler(var,mcvar)
-        res = run_instrument(var,mcvar)
-        check_for_detector_output(var,mcvar)
+        res = run_instrument(var,mcvar, var_list)
+        check_for_detector_output(var,mcvar, var_list)
+        save_var_list(var_list, var.sim_res/mcvar.dn/'var_list')  #save mcstas variables
         psave(mcvar, var.sim_res/mcvar.dn/'variables')  #save mcstas variables
-        #post_mcrun_funktions(var, mcvar, msg) # contains functions that get executed after mcstas finished and can i.e. reformate the output
         print('simulation successfully\n')
-
         return mcvar, res
 
+# helper function
 def print_mcvariable_from_instrument(instrument):
     for line in create_class_mcvariables_lines(instrument):
         print(line)
 
+# fuction to create local_var.py and load it
 def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_dir='simulation_results', component_dir='', mpi=0):
+    # substituting \ for / to avoid complications with the paths
     if os.name == 'nt':
         working_dir   = re.sub(r'\\','/', working_dir)
         mcstas        = re.sub(r'\\','/', mcstas)
@@ -73,6 +103,7 @@ def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_d
         output_dir    = re.sub(r'\\','/', output_dir)
         component_dir = re.sub(r'\\','/', component_dir)
 
+    # checking instrument file
     instr_file = working_dir + "/" + instrument
     if not isfile(instr_file):
         sys.exit(f" the instrument file '{instrument}' is not located in the working directory '{working_dir}'")
@@ -82,8 +113,11 @@ def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_d
                  \ngot: {instrument}\
                  \nplease make shure to give a valid instrument file")
 
+    # checking working directory
     if not isdir(working_dir):
         sys.exit(f"the given working directory '{working_dir}' dose not exist")
+
+    # checking output directory
     if isabs(output_dir):
         if not isdir(output_dir):
             sys.exit(f"the given simulation result directory '{output_dir}' dose not exist")
@@ -92,10 +126,17 @@ def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_d
             os.mkdir(f"{working_dir}/{output_dir}")
             print(f"created simulation result directory '{output_dir}' in the working directory")
 
-    if os.name=='nt':
-        which(f"{mcstas} -v")
+    # checking for mcstas executable
+    mcstas_exe = which(mcstas)
+    if not mcstas_exe:
+        print(f"\nMcStas is not installed or the Path is inocrrect: {mcstas}")
+        return
+    if islink(mcstas_exe):
+        mcstas = os.readlink(mcstas_exe)
     else:
-        which(mcstas)
+        mcstas = mcstas_exe
+
+    # checking gcc or mpi existence
     if mpi == 0:
         # test if gcc exists
         if os.name=='nt':
@@ -109,6 +150,7 @@ def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_d
         else:
             which("mpicc")
 
+    # parsing arguments
     args= argparse.Namespace(working_dir=working_dir,\
                             mcstas=mcstas,\
                             instrument=instrument,\
@@ -116,14 +158,18 @@ def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_d
                             component_dir=component_dir,\
                             mpi = mpi)
 
+    # creating local_var.py file if not exiisting
+    #TODO: check if imput correspont to existing local_var.py and give user feedback
     if not os.path.isfile(f"{working_dir}/local_var.py"):
         create_local_var(args)
 
+    # importing local variables
     sys.path.append(working_dir)
     from local_var import variables
     var = variables()
     valid_config(var)
 
+    # printing mcvariables class
     print(f'####################\ncopy the following part and execute it in a new cell\n####################\n')
     print("from mcpw.mcstas_wrapper import Scan\n")
     for line in create_class_mcvariables_lines(instr_file):

@@ -1,5 +1,14 @@
 # McStas Python Wrapper (mcpw)
 
+## Update Notifications
+
+### 0.2.2->0.3.0:
+renamed function: post_mcrun_funktions() to post_simulation()
+introduced mandatory function pre_simulation()
+
+added special function custom():
+
+
 ## Requirements
 
 A mcstas instrument with all components
@@ -17,6 +26,8 @@ The Define Section of your instrument must have following Format:
 
 empty lines will be ignored
 
+In order to have proper MPI support this script depends on the Open MPI implemenation when using unix based systems.
+MPIexec will not work and leads to an error.
 
 ## Short Overview
 
@@ -75,8 +86,62 @@ the minimal command to run a simmulation is:
 	
 	mcpw_manager -p instrument.py local
 
+## Use of Scan class and var_lists
+
+### Scan Class
+
+The mcvariables class contains a variable called scan that is object of the Scan class.
+The first two arguments are the start and stop range for the Scan, the 3. value is a string which represents the unit of the scan variable. the 4. value is the number of steps.
+The scan points are evenly distributed between the start and stop points, which are included.
+
+### Scaning with a csv file
+
+witch the -l, --list argument you can provide a csv file with datapoints.
+The first row has to be a header row containing the names of the variables below them. the names have to match with the once in you instrument.
+Each row represents one simulation and has to be fully filled with values that can be cast to a python float.
+variable that dont change at all dont need to be part of the list and will be taken from the mcvariable class.
+
+mini example csv:
+
+	  x,    y,   z
+	  1,    4,   7
+	1.4,    6,   9
+	  2, 4e-4, 9e5
+
+## Jupyter Notebook Usage
+
+This Package can be used also in jupyter notebook.
+
+First you have to import the basic functions initialize, simulate, load_mcvariables:
+
+	from mcpw.jupyter_functions import initialize, simulate, load_mcvariables
+
+next you have to initialize the local variables:
+
+	var = initialize(instrument='instrument.instr', working_dir='relative_or_absolute_path'(optional), mcstas='mcstas_path_or_link'(optional), output_dir='simulation_results'(optional), component_dir='relative_or_absolute_path'(optional), mpi=#cores(optional)
+
+the default for mcstas is 'mcstas'
+You will get a printout for your mcvariable class. copy the section into the next cell and execute it.
+
+now var and mcvar should be initialized.
+
+now you can run a simmulation with
+
+	mcvar, res = simulate(var,mcvar, dn='bla')
+
+this function returns the used mcvariables and a list of result directorys where the simulation results are saved.
+if the command is called a second time with the same value for dn, the mcvariables and result directorys for this dn will be loaded end returned
+
+if you want to use the default mcstas plotter, you can import it:
+	
+	from mcpw.mcstas_wrapper import mcplot
+	mcplot(var,mcvar)
 
 
+## Special function custom():
+if this function exists in the python file and the mode is set to custom, the compile steps are executed and then the custom function is executed, followed by the analyse function.
+This is highly advanced. you need to make shure that the check_for_detector_output function, psave function, and other critical functions are executed.
+This function takes the place of the run_instrument() function as well as all save functions.
 
 ## Command Usage
 
@@ -92,7 +157,9 @@ the minimal command to run a simmulation is:
 	                        path (absolute or not) to the python file containing mcvariables and analyse functions
 	  -d RESULT_DIR, --result-dir RESULT_DIR
 	                        directory name for the simulationresults. If none is given or foulder name exists allrady, a increment Folder Name is generated
-	
+      -l LIST, --list LIST  a file containing variables in csv format. first row has to match with variable names occuring in the instrument. variables that are not in here take the value from the py file. each row is a single simmulation.
+                            list will be saved together with the result for later use 
+
 	modes:
 	  Use 'manager mode --help' to view the help for any command.
 	
@@ -102,6 +169,7 @@ the minimal command to run a simmulation is:
 	    local               mcstas will be executed on localy
 	    full                mcstas will be executed on localy and the analyze function will be called after
 	    analyse             analyse function will be called
+		custom              runs the mcstas compiler, c compiler and a everyting that is in the function called custom in your python file. analyse function will be called !!!EXTREMLY EXPERIMENTAL!!!
 
 ### Usage of mcpw_setup
 	

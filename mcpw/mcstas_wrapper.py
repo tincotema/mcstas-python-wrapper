@@ -5,6 +5,7 @@ import os
 from os.path import isfile, isdir, isabs, dirname, basename, splitext, join, islink
 import locale
 from shutil import copyfile, which
+import csv
 class Scan():#helping class for easyer use of the scan funktionality of mcstas, needs start and stop value and the unit of the values as well the numbers of steps
     def __init__(self, start, stop, unit, N):
         self.start = start
@@ -157,9 +158,10 @@ def run_compiler(var,mcvar, cflags=""):
     execute(run_string, "An error occurred while running the C Compiler", "C compiler done")
 
 # (mpirun -np 2) instr.out -n -d var=value
-def run_instrument(var,mcvar):
+def run_instrument(var,mcvar,var_list):
     errormsg = "The Simmulation Failed"
     successmsg = "The simmulation compleated successfully"
+    no_use_vars = ["scan", "n", "dn", "instr_file"]
     if os.name=='nt':
         instr_out_file = mcvar.instr_file.split('.')[0] + ".exe"
     else:
@@ -177,13 +179,34 @@ def run_instrument(var,mcvar):
             run_string = f"mpirun --use-hwthread-cpus -np {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
     # parsing the parameters and checking if a scan is required
     for var_name, var_value in mcvar.__dict__.items():
-        if not (var_name in ["scan", "n", "dn", "instr_file"]):
+        if not (var_name in no_use_vars):
             if isinstance(var_value, Scan):
                 scan_var = [var_name, var_value]
             else:
                 params = params + f"{var_name}={var_value} "
     # scan or no scan
-    if scan_var:
+    if var_list:
+        params = ''
+        #creating main result directory
+        os.mkdir(var.sim_res/mcvar.dn)
+        for name in var_list[0]:
+            no_use_vars.append(name)
+        for i in range(len(var_list)-1):
+            print(f"step:{i+1}/{len(var_list)-1}")
+            for j, name in enumerate(var_list[0]):
+                params = params + f"{name}={var_list[i+1][j]} "
+            for var_name, var_value in mcvar.__dict__.items():
+                if not (var_name in no_use_vars):
+                    if isinstance(var_value, Scan):
+                        sys.exit("VALUE ERROR: You can not have a Scan and the list opiton at the same time.\n Exiting")
+                    else:
+                        params = params + f"{var_name}={var_value} "
+            final_run_string = run_string + f"-d {str(var.sim_res/mcvar.dn/str(i))} {params} "
+
+            execute(final_run_string, errormsg, successmsg, print_command=False)
+            res_list.append(var.sim_res/mcvar.dn/str(i))
+
+    elif scan_var:
         #scan
         #creating main result directory
         os.mkdir(var.sim_res/mcvar.dn)
@@ -203,15 +226,33 @@ def run_instrument(var,mcvar):
     return res_list
 
 def psave(obj, file_path):#saves the given object as a pickle dump in the given file (file gets created)
-    f = open(file_path, mode='xb')
-    pickle.dump(obj, f)
-    f.close
+    if obj:
+        f = open(file_path, mode='xb')
+        pickle.dump(obj, f)
+        f.close
 
 def pload(file_path):#funktion can read file writen by the psave function and returns its content
     f = open(file_path, mode='rb')
     obj = pickle.load(f)
     f.close
     return obj
+
+def load_var_list(file_path):
+    var_list = []
+    with open(file_path, newline='') as csvfile:
+        csvdata = csv.reader(csvfile)# delimiter=',', quotechar='|')
+        for row in csvdata:
+            var_list.append(row)
+    for x in range(len(var_list)-1):
+        for y in range(len(var_list[0])):
+            var_list[x+1][y] = float(var_list[x+1][y])
+    return var_list
+
+def save_var_list(var_list, filename):
+    with open(filename, mode='w') as csvfile:
+        w = csv.writer(csvfile)
+        for i in range(len(var_list)):
+            w.writerow(var_list[i])
 
 def check_scan(var, mcvar, msg): #ignore for now, is something i might implement later fully
     dir_num = len(os.listdir(var.sim_res/mcvar.dn))
@@ -227,8 +268,13 @@ def is_scan(mcvar):
             return True
     return False
 
-def check_for_detector_output(var, mcvar):
-    if is_scan(mcvar):
+def check_for_detector_output(var, mcvar, var_list):
+    if var_list:
+        for i in range(len(var_list)-1):
+            if not os.path.isdir(var.sim_res/mcvar.dn/str(i)):
+                print(f"the mcstas output dir {mcvar.dn}/{i} dose not exist.\nexiting")
+                exit()
+    elif is_scan(mcvar):
         for i in range(mcvar.scan.N):
             if not os.path.isdir(var.sim_res/mcvar.dn/str(i)):
                 print(f"the mcstas output dir {mcvar.dn}/{i} dose not exist.\nexiting")
@@ -262,7 +308,7 @@ def get_result_path_from_input(var, mcvar, msg, args):# logic for retreiveng the
             return new_name, msg
     return name, msg
 
-def mcplot(var,mcvar,msg='', mode=''):
+def mcplot(var,mcvar,msg='', mode='qt'):
     if os.name == 'nt':
         mcplot_dir = f"{dirname(var.mcstas)}/../lib/tools/Python/mcplot"
     else:
