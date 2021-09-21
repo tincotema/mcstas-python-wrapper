@@ -81,8 +81,8 @@ def main():
     # pulling relevant functions and classes from python file
     mcvariables = vars(pyinstr)['mcvariables']
     analyse = vars(pyinstr)['analyse']
-    post_instrument = vars(pyinstr)['post_instrument']
-    pre_instrument = vars(pyinstr)['pre_instrument']
+    post_simulation = vars(pyinstr)['post_simulation']
+    pre_simulation = vars(pyinstr)['pre_simulation']
     # initializing mcvariables class
     mcvar = mcvariables()
     var_list = []
@@ -112,7 +112,6 @@ def main():
         if args.func == 'analyse':
             try:
                 var_list = load_var_list(var.sim_res/mcvar.dn/'var_list')
-                print(var_list)
             except: var_list = []
             mcvar = pload(var.sim_res/mcvar.dn/'variables') #loading the correct variables
             valid_mcconfig(var,mcvar)
@@ -122,12 +121,12 @@ def main():
         elif args.func == 'server':#this runs the script in server mde
             run_mcstas(var,mcvar)
             run_compiler(var,mcvar)
-            var,mcvar,var_list=pre_instrument(var,mcvar,var_list)
+            var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
             run_instrument(var,mcvar, var_list)
             check_for_detector_output(var,mcvar,var_list)
             save_var_list(var_list, var.sim_res/mcvar.dn/'var_list')  #save mcstas variables
             psave(mcvar, var.sim_res/mcvar.dn/'variables')  #save mcstas variables
-            post_instrument(var, mcvar, var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
+            post_simulation(var, mcvar, var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
             sp.run(['tar', '-cf' '{}/{}.tar'.format(var.sim_res, mcvar.dn), var.sim_res/mcvar.dn]) #compress data
 
         elif args.func == 'remote':#use this if you want to run the simulation on a remote machine (setup has to be done beforhand)
@@ -141,22 +140,22 @@ def main():
         elif args.func == 'local':#use this to run the script localy
             run_mcstas(var,mcvar)
             run_compiler(var,mcvar)
-            var,mcvar,var_list=pre_instrument(var,mcvar,var_list)
+            var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
             run_instrument(var,mcvar,var_list)
             check_for_detector_output(var,mcvar,var_list)
             save_var_list(var_list, var.sim_res/mcvar.dn/'var_list')  #save mcstas variables
             psave(mcvar, var.sim_res/mcvar.dn/'variables')  #save mcstas variables
-            post_instrument(var, mcvar,var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
+            post_simulation(var, mcvar,var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
 
         elif args.func == 'full':
             run_mcstas(var,mcvar)
             run_compiler(var,mcvar)
-            var,mcvar,var_list=pre_instrument(var,mcvar,var_list)
+            var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
             run_instrument(var,mcvar,var_list)
             check_for_detector_output(var,mcvar,var_list)
             save_var_list(var_list, var.sim_res/mcvar.dn/'var_list')  #save mcstas variables
             psave(mcvar, var.sim_res/mcvar.dn/'variables')  #save mcstas variables
-            post_instrument(var, mcvar, var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
+            post_simulation(var, mcvar, var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
             analyse(var, mcvar,var_list)                                               #call analyse, defined in reseda.py
 
         elif args.func == 'custom':
