@@ -118,7 +118,7 @@ First you have to import the basic functions initialize, simulate, load_mcvariab
 
 next you have to initialize the local variables:
 
-	var = initialize(instrument='instrument.instr', working_dir='relative_or_absolute_path'(optional), mcstas='mcstas_path_or_link'(optional), output_dir='simulation_results'(optional), component_dir='relative_or_absolute_path'(optional), mpi=#cores(optional)
+	var = initialize(instrument='instrument.instr'[, working_dir='relative_or_absolute_path', mcstas='mcstas_path_or_link', output_dir='simulation_results', component_dir='relative_or_absolute_path', mpi=#cores])
 
 the default for mcstas is 'mcstas'
 You will get a printout for your mcvariable class. copy the section into the next cell and execute it.
@@ -127,10 +127,11 @@ now var and mcvar should be initialized.
 
 now you can run a simmulation with
 
-	mcvar, res = simulate(var,mcvar, dn='bla')
+	mcvar, res = simulate(var, mcvar, dn='bla'[,var_list=[], var_list_csv=PATH])
 
 this function returns the used mcvariables and a list of result directorys where the simulation results are saved.
 if the command is called a second time with the same value for dn, the mcvariables and result directorys for this dn will be loaded end returned
+var_list expects an array in the form discribed in ## U
 
 if you want to use the default mcstas plotter, you can import it:
 	
@@ -142,6 +143,30 @@ if you want to use the default mcstas plotter, you can import it:
 if this function exists in the python file and the mode is set to custom, the compile steps are executed and then the custom function is executed, followed by the analyse function.
 This is highly advanced. you need to make shure that the check_for_detector_output function, psave function, and other critical functions are executed.
 This function takes the place of the run_instrument() function as well as all save functions.
+
+## List of usefull functions
+### General functions
+
+pickle binary dump:
+
+	mcpw.mcstas_wrapper.psave(obj, file_path)
+
+pickle binary load (returns a object):
+
+	mcpw.mcstas_wrapper.pload(file_path)
+
+function to determen if a set of mcvariables triggers a Scan:
+	
+	mcpw.mcstas_wrapper.if_scan(mcvar)
+
+the original mcplot function:
+
+	mcpw.mcstas_wrapper.mcpot(var,mcvar[, mode='qt'])
+
+###Functions explicit for jupyter notebook:
+Function returning mcvariables from simmulation:
+
+	load_mcvariables(var, dn='')
 
 ## Command Usage
 
