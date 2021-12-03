@@ -72,7 +72,7 @@ class mcvariables():#class to hold the variables needed to run the mcstas simula
         self.N              = 1       #steps (see sweep)
         self.instr_file     = "test.instr" #the name of the instrument file, must be located in p_server/p_local, all custom components used by the instrument must be located in the same diretory
         #
-        #self.sweep          = Sweep(-0.1,0.1,'A')
+        #self.scan          = Scan(-0.1,0.1,'A')
         # variables defined in the DEFINE INSTRUMENT section of the mcstas instrument
         x = 1.0,        //comment
         i = 1,          //comment
@@ -135,7 +135,7 @@ def create_class_mcvariables_lines(instrument):
 def create_header_lines():
     header_lines = []
     header_lines.append(f'# import section')
-    header_lines.append(f'from mcpw.mcstas_wrapper import Scan')
+    header_lines.append(f'from mcpw.mcstas_wrapper import Scan, mcplot')
     header_lines.append(f'')
     header_lines.append(f'#this file must allways contain:')
     header_lines.append(f'#class mcvariables() a class containing all parameters for the mcstas instrument file')
@@ -181,6 +181,7 @@ def create_main_lines():
     main_lines.append(f'    # code to analyse simulation results')
     main_lines.append(f'    # example for the case of binary output and mcstas formated ouput form the simulation')
     main_lines.append(f'    custom_function3(var,mcvar,var_list)')
+    main_lines.append(f'    mcplot(var,mcvar)')
     main_lines.append(f'')
     main_lines.append(f'# end of documentation')
 

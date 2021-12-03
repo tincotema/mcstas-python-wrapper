@@ -1,13 +1,21 @@
 # McStas Python Wrapper (mcpw)
 
+On Windows: If you are using the conda powershell delivert with the mcstas installation use this command to install:
+
+	pyhton -m pip install mcpw
+
+this will ensure that it will end in the virtual environment ov the conda shell
+
 ## Update Notifications
 
 ### 0.2.2->0.3.0:
 renamed function: post_mcrun_funktions() to post_simulation()
 introduced mandatory function pre_simulation()
 
-added special function custom():
+Added special function custom():
 
+### 0.4.0:
+mcplot now fully supports all forms of scans 
 
 ## Requirements
 
@@ -24,7 +32,7 @@ The Define Section of your instrument must have following Format:
 	    float f = 1.0,      //comment
 	)
 
-empty lines will be ignored
+Empty lines will be ignored.
 
 In order to have proper MPI support this script depends on the Open MPI implemenation when using unix based systems.
 MPIexec will not work and leads to an error.
@@ -36,77 +44,139 @@ Processing the simmulation results.
 
 The Functionality is build around the two Classes variables and mcvariables.
 
-### class variables
-variables are global variables that apply to any simulation and contains the location of the main working directory.
-it is automatically generated with the 'mcpw_setup' command and is saved in local_var.python_requires
+### Class variables
+Parameters of the class variables are global variables that apply to any simulation and contains the location of the main working directory.
+It is automatically generated with the 'mcpw_setup' command and is saved in local_var.py
 
-### class mcvariables
-mcvariables contains all important variables to run a simulation.
-the mcpw_setup command will create it from the given instrument file and put it into instrument_name.py file.
+The typical name vor the initialized class is 'var'.
 
-### the instrument.py file
-the instrument.py file will be the main file you will work in.
-appart from the mcvariables class it will contain all your custom functions
+The class variables you will find the most usefull will be:
+
+-var.p_local The Local Working directory (Absolute Path; a Path object)
+-var.sim_res The simulation result folder in your p_local dir.
+
+All other variables should not be necessary to use in your code.
+
+
+### Class mcvariables
+Parameters of the class mcvariables contain all important values to run a simulation.
+The mcpw_setup command will create it from the given instrument file and put it into instrument_name.py file.
+
+The typical name vor the initialized class is 'mcvar'.
+
+The class variables you will find the most usefull will be:
+
+-mcvar.dn The drectory(name) of a particular simulation
+-mcvar.sweep see Sweep Class below
+
+All other variables should be self explanatory
+
+If one of the variables of your instrument is set to self.scan, the program will run as many simulation steps as defined in the scan variable (see Scan Class below).
+You can only scan one variable at a time with this method. To scan multiple variables at once see 'Scaning with csv file'.
+
+
+### The instrument.py file
+The instrument.py file will be the main file you will work in.
+Appart from the mcvariables class it will contain all your custom functions
 for analysing and datatreatment.
-here you import all necessary packages and all your functions you want to get executed you add into
-the analyse() function or the post_mcrun_funktions() function.
-the analyse and post_mcrun_funktions will be called by mcpw_manager and executed
+Here you import all necessary packages and all your functions you want to get executed and call them in
+the analyse(), pre_simulation() or post_simulation() function.
+These three functions will be called by mcpw_manager and executed at the correct time
 
+#### pre_simulation(var,mcvar,var_list)
+This function can change var, mcvar, and var_list at runtime before the simulation is called.
+You can use it to reformat your var_list, create a new one or have fancy interconecting of your mcstas variables.
+The changed variables will later be saved together with the simulation results.
+This function is not called if you only analyse a old results.
+
+#### post_simulation(var,mcvar, var_list)
+This function is called directly after the simulation and is ment to be a part of postprocessing that permanently change the data from the simulation.
+You can for example compress the detector output of several detector to single file to save disk space.
+
+#### analyse(var,mcvar,var_list)
+This function should contains everyting to analyse and visualize the results in a non destructive way.
+If you use the "full" mode of mcpw_manager it is called at the very end of the simulation also after post_simulation.
+
+You can call it also seperatly for an older simulation you did with the "analyse" mode. 
+Here the -d option of mcpw_manager indicates witch old simulation you want to analyse.
+The corresponding mcvariables potentially used var_list is automatically loaded. If no -d option is specified the latest available simulation is analysed.
 
 ## First Setup
 
 Requirements:
 
-the mcpw_setup command creates all necessary files in order to use the mcpw_manager command.
+The mcpw_setup command creates all necessary files in order to use the mcpw_manager command.
 
-cd to the directory where your mcstas instrument lies
+Go to the directory where your mcstas instrument lies,
 
-then execute mcpw_setup:
+Then execute mcpw_setup:
 
 	mcpw_setup -I instrument.instr -d working_directory -m path_to_mcstas_executable -o output_directory -c component_directory
 
-necessary is only the -I instrument.intr argument.
+Necessary is only the -I instrument.intr argument.
 
-with the -d working_directory argument you can set a different directory than your current one as the main working directory
+With the -d working_directory argument you can set a different directory than your current one as the main working directory.
 
-with the -m argument you can give the location of your mcstas installation. only needed if you did not install mcstas with a packages manager
+With the -m argument you can give the location of your mcstas installation. only needed if you did not install mcstas with a packages manager.
 
-with the -o argument you can specify the location of the output directory where the simulation results are put in. the default is 'simulation_results' in the main working directory
+With the -o argument you can specify the location of the output directory where the simulation results are put in. the default is 'simulation_results' in the main working directory.
 
-with the -c argument you can specify extra locations for mcstas components
+With the -c argument you can specify extra locations for mcstas components.
 
+An allrady existing local_var.py or instrument.py file will not be updated or replaced.
 
-if you have no errors and have two files: local_var.py and instrument.py in your working directory the setup stepp is compleated
+If you have no errors and have two files: local_var.py and instrument.py in your working directory the setup step is compleated.
 
 ## First Use
 
-with mcpw_manager you can execute your simulation and all relevant functions you added to the analyse and post_mcrun_funktions functions.
+With mcpw_manager you can execute your simulation and all relevant functions you added to the analyse and post_mcrun_funktions functions.
 
-the minimal command to run a simmulation is:
+The minimal command to run a simmulation is:
 	
-	mcpw_manager -p instrument.py local
+	mcpw_manager -p instrument.py full
+
+For more advanced usecases have a look at mcpw_manager --help .
 
 ## Use of Scan class and var_lists
 
 ### Scan Class
 
 The mcvariables class contains a variable called scan that is object of the Scan class.
-The first two arguments are the start and stop range for the Scan, the 3. value is a string which represents the unit of the scan variable. the 4. value is the number of steps.
+
+The Scan class is used to simplify the process of runing a number of simulations over a range of one variable.
+If you want to change more than one variable per step, use the csv file function. 
+
+The first two arguments are the start and stop range for the Scan, the 3th value is a string which represents the unit of the scan variable. the 4th value is the number of steps.
 The scan points are evenly distributed between the start and stop points, which are included.
 
-### Scaning with a csv file
+Propertys of the Scan class are:
 
-witch the -l, --list argument you can provide a csv file with datapoints.
-The first row has to be a header row containing the names of the variables below them. the names have to match with the once in you instrument.
+-scan.start             start value
+-scan.stop              stop value
+-scan.range             stop - start
+-scan.unit              normaly a string that can be used in the automatic labeling of graphs
+-scan.N                 number of steps to scan the range with
+-scan.step              size of one step
+-scan.absolute_value(n) absolute value of the n-th step
+
+
+### Scaning with csv file
+
+Witch the -l, --list argument you can provide a csv file with datapoints.
+The first row has to be a header row containing the names of the variables below them. The names have to match with the once in you instrument.
 Each row represents one simulation and has to be fully filled with values that can be cast to a python float.
-variable that dont change at all dont need to be part of the list and will be taken from the mcvariable class.
+Variable that dont change at all dont need to be part of the list and will be taken from the mcvariable class.
 
-mini example csv:
+Mini example csv:
 
 	  x,    y,   z
 	  1,    4,   7
 	1.4,    6,   9
 	  2, 4e-4, 9e5
+
+The content of the csv is loaded into the variable var_list.
+
+If you want to load a csv with a different format than described above, you have to reformat it accordingly inside the scope of the pre_simulation function.
 
 ## Jupyter Notebook Usage
 
@@ -116,32 +186,30 @@ First you have to import the basic functions initialize, simulate, load_mcvariab
 
 	from mcpw.jupyter_functions import initialize, simulate, load_mcvariables
 
-next you have to initialize the local variables:
+Next you have to initialize the local variables:
 
 	var = initialize(instrument='instrument.instr'[, working_dir='relative_or_absolute_path', mcstas='mcstas_path_or_link', output_dir='simulation_results', component_dir='relative_or_absolute_path', mpi=#cores])
 
-the default for mcstas is 'mcstas'
+The default for mcstas is 'mcstas'
 You will get a printout for your mcvariable class. copy the section into the next cell and execute it.
 
-now var and mcvar should be initialized.
-
-now you can run a simmulation with
+Now var and mcvar should be initialized and you can run a simmulation with:
 
 	mcvar, res = simulate(var, mcvar, dn='bla'[,var_list=[], var_list_csv=PATH])
 
-this function returns the used mcvariables and a list of result directorys where the simulation results are saved.
-if the command is called a second time with the same value for dn, the mcvariables and result directorys for this dn will be loaded end returned
-var_list expects an array in the form discribed in ## U
+This function returns the used mcvariables and a list of result directorys where the simulation results are saved.
+If the command is called a second time with the same value for dn, the mcvariables and result directorys for this dn will be loaded end returned.
+The var_list parameter expects an array in the form discribed above.
 
-if you want to use the default mcstas plotter, you can import it:
+If you want to use the default mcstas plotter, you can import it:
 	
 	from mcpw.mcstas_wrapper import mcplot
 	mcplot(var,mcvar)
 
 
 ## Special function custom():
-if this function exists in the python file and the mode is set to custom, the compile steps are executed and then the custom function is executed, followed by the analyse function.
-This is highly advanced. you need to make shure that the check_for_detector_output function, psave function, and other critical functions are executed.
+If this function exists in the python file and the mode is set to custom, the compile steps are executed and then the custom function is executed, followed by the analyse function.
+This is highly advanced. You need to make shure that the check_for_detector_output function, psave function, and other critical functions are executed.
 This function takes the place of the run_instrument() function as well as all save functions.
 
 ## List of usefull functions

@@ -6,6 +6,7 @@ from os.path import isfile, isdir, isabs, dirname, basename, splitext, join, isl
 import locale
 from shutil import copyfile, which
 import csv
+from datetime import datetime
 class Scan():#helping class for easyer use of the scan funktionality of mcstas, needs start and stop value and the unit of the values as well the numbers of steps
     def __init__(self, start, stop, unit, N):
         self.start = start
@@ -29,6 +30,7 @@ def execute(command, errormsg, successmsg, print_command=True):
         sys.exit(errormsg)
     else:
         print(f"{successmsg}\n")
+    return run_return
 
 def valid_config(var):
     #check dirs
@@ -159,6 +161,8 @@ def run_compiler(var,mcvar, cflags=""):
 
 # (mpirun -np 2) instr.out -n -d var=value
 def run_instrument(var,mcvar,var_list):
+    sys.path.append(f'{os.path.dirname(var.mcstas)}/../tools/Python/mcrun')
+    from mccode import McStasResult
     errormsg = "The Simmulation Failed"
     successmsg = "The simmulation compleated successfully"
     no_use_vars = ["scan", "n", "dn", "instr_file"]
@@ -187,14 +191,17 @@ def run_instrument(var,mcvar,var_list):
     # scan or no scan
     if var_list:
         params = ''
+        dets_vals = []
         #creating main result directory
         os.mkdir(var.sim_res/mcvar.dn)
         for name in var_list[0]:
             no_use_vars.append(name)
         for i in range(len(var_list)-1):
+            value_list=[]
             print(f"step:{i+1}/{len(var_list)-1}")
             for j, name in enumerate(var_list[0]):
                 params = params + f"{name}={var_list[i+1][j]} "
+                value_list.append(str(var_list[i+1][j]))
             for var_name, var_value in mcvar.__dict__.items():
                 if not (var_name in no_use_vars):
                     if isinstance(var_value, Scan):
@@ -203,22 +210,39 @@ def run_instrument(var,mcvar,var_list):
                         params = params + f"{var_name}={var_value} "
             final_run_string = run_string + f"-d {str(var.sim_res/mcvar.dn/str(i))} {params} "
 
-            execute(final_run_string, errormsg, successmsg, print_command=False)
+            out = execute(final_run_string, errormsg, successmsg, print_command=False)
+            dets=McStasResult(out.stdout).get_detectors()
+            for det in dets:
+                print(f'det.intensity: {det.intensity}, det.error: {det.error}')
+                value_list.append(str(det.intensity))
+                value_list.append(str(det.error))
             res_list.append(var.sim_res/mcvar.dn/str(i))
+            dets_vals.append(value_list)
+        create_sim_file(dets, var, mcvar, var_list)
+        create_dat_file(dets, var, mcvar, var_list, dets_vals)
 
     elif scan_var:
         #scan
         #creating main result directory
         os.mkdir(var.sim_res/mcvar.dn)
+        dets_vals = []
         #scanning all points
         print(f"running: {run_string} {scan_var[0]}={scan_var[1].mc} ")
         for i in range (scan_var[1].N):
+            value_list=[str(scan_var[1].absolute_value(i))]
             print(f"step: {scan_var[0]}={scan_var[1].absolute_value(i)}")
             i_params = params + f"{scan_var[0]}={scan_var[1].absolute_value(i)} "
             final_run_string = run_string + f"-d {str(var.sim_res/mcvar.dn/str(i))} {i_params} "
 
-            execute(final_run_string, errormsg, successmsg, print_command=False)
+            out = execute(final_run_string, errormsg, successmsg, print_command=False)
+            dets=McStasResult(out.stdout).get_detectors()
+            for det in dets:
+                value_list.append(str(det.intensity))
+                value_list.append(str(det.error))
             res_list.append(var.sim_res/mcvar.dn/str(i))
+            dets_vals.append(value_list)
+        create_sim_file(dets, var, mcvar, var_list)
+        create_dat_file(dets, var, mcvar, var_list, dets_vals)
     else:
         final_run_string = run_string + f"-d {str(var.sim_res/mcvar.dn)} {params} "
         execute(final_run_string, errormsg, successmsg)
@@ -265,7 +289,7 @@ def check_scan(var, mcvar, msg): #ignore for now, is something i might implement
 def is_scan(mcvar):
     for var_name, var_value in mcvar.__dict__.items():
         if not var_name == "scan" and isinstance(var_value,Scan):
-            return True
+            return var_name
     return False
 
 def check_for_detector_output(var, mcvar, var_list):
@@ -309,20 +333,105 @@ def get_result_path_from_input(var, mcvar, msg, args):# logic for retreiveng the
     return name, msg
 
 def mcplot(var,mcvar,msg='', mode='qt'):
-    if os.name == 'nt':
-        mcplot_dir = f"{dirname(var.mcstas)}/../lib/tools/Python/mcplot"
-    else:
-        mcplot_dir= f"{dirname(var.mcstas)}/../tools/Python/mcplot"
     if mode == 'qt':
-        run_string= f"{mcplot_dir}/pyqtgraph/mcplot.py "
+        run_string= f"{dirname(var.mcstas)}/mcplot-pyqtgraph "
     else:
-        run_string= f"{mcplot_dir}/matplotlib/mcplot.py "
-
-    if is_scan(mcvar):
-        print('mcplot for a Scann not jet implemented')
-        return
-    else:
-        run_string=run_string+f"{var.sim_res/mcvar.dn}"
-    print(run_string)
+        run_string= f"{dirname(var.mcstas)}/mcplot-matplotlib "
+    run_string=run_string+f"{var.sim_res/mcvar.dn}"
     sp.run(run_string, shell=True)
 
+
+
+def create_sim_file(dets, var, mcvar,var_list):
+    if var_list:
+        steps = len(var_list)-1
+        scan_name = ", ".join(var_list[0])
+        params = ""
+        for i in range(len(var_list[0])):
+            print(f' {var_list[0][i]} = {var_list[1][i]}, {var_list[0][i]} = {var_list[-1][i]},')
+            params+=f' {var_list[0][i]} = {var_list[1][i]}, {var_list[0][i]} = {var_list[-1][i]},'
+        params = params[:-1] # removing last comma
+        xlimits = f' {var_list[1][0]} {var_list[-1][0]}'
+    else:
+        steps = mcvar.scan.N
+        scan_name = is_scan(mcvar)
+        params = f' {scan_name} = {mcvar.scan.start}, {scan_name} = {mcvar.scan.stop}'
+        xlimits = f' {mcvar.scan.start} {mcvar.scan.stop}'
+    lines = []
+    lines.append(f'begin instrument:')
+    lines.append(f'  Creator: mcstas {execute(f"{var.mcstas} -v", "","",print_command=False).stdout.split(" ")[2]}')
+    lines.append(f'  Source: {mcvar.instr_file}')
+    lines.append(f'  Parameters: {scan_name}')
+    lines.append(f'  Trace_enabled: no')
+    lines.append(f'  Default_main: yes')
+    lines.append(f'  Embedded_runtime: yes')
+    lines.append(f'end instrument:')
+    lines.append(f'')
+    lines.append(f'begin simulation')
+    lines.append(f'Date: {datetime.strftime(datetime.now(),"%a %b %d %H %M %Y")}')
+    lines.append(f'Ncount: {mcvar.n}')
+    lines.append(f'Numpoints: {steps}')
+    lines.append(f'Param:{params}')
+    lines.append(f'end simulation')
+    lines.append(f'')
+    lines.append(f'begin data')
+    lines.append(f'type: multiarray_1d({steps})')
+    lines.append(f'title: Scan of {scan_name}')
+    lines.append(f'xvars: {scan_name}')
+    det_string=""
+    variables_string=""
+    for det in dets:
+        det_string+= f' ({det.name}_I,{det.name}_ERR)'
+        variables_string+= f' {det.name}_I {det.name}_ERR'
+    lines.append(f'yvars:{det_string}')
+    lines.append(f"xlabel: '{scan_name}'")
+    lines.append(f"ylabel: 'Intensity'")
+    lines.append(f'xlimits:{xlimits}')
+    lines.append(f'filename: mccode.dat')
+    lines.append(f'variables: {scan_name.replace(",","")}{variables_string}')
+    lines.append(f'end data')
+
+    with open(var.sim_res/mcvar.dn/'mccode.sim', "w") as simfile:
+        for line in lines:
+            simfile.write("{}\n".format(line))
+
+def create_dat_file(dets, var, mcvar, var_list, dets_vals):
+    if var_list:
+        steps = len(var_list)-1
+        scan_name = ", ".join(var_list[0])
+        params = ""
+        for i in range(len(var_list[0])):
+            params+=f' {var_list[0][i]} = {var_list[1][i]},'
+        params = params[:-1] # removing last comma
+        xlimits = f' {var_list[1][0]} {var_list[-1][0]}'
+    else:
+        steps = mcvar.scan.N
+        scan_name = is_scan(mcvar)
+        params = f' {scan_name} = {mcvar.scan.start}'
+        xlimits = f' {mcvar.scan.start} {mcvar.scan.stop}'
+    lines = []
+    lines.append(f"# Instrument-source: '{mcvar.instr_file}'")
+    lines.append(f'# Date: {datetime.strftime(datetime.now(),"%a %b %d %H %M %Y")}')
+    lines.append(f'# Ncount: {mcvar.n}')
+    lines.append(f'# Numpoints: {steps}')
+    lines.append(f'# Param:{params}')
+    lines.append(f'# type: multiarray_1d({steps})')
+    lines.append(f'# title: Scan of {scan_name}')
+    lines.append(f"# xlabel: '{scan_name}'")
+    lines.append(f"# ylabel: 'Intensity'")
+    lines.append(f'# xvars: {scan_name}')
+    det_string=""
+    variables_string=""
+    for det in dets:
+        det_string+= f' ({det.name}_I,{det.name}_ERR)'
+        variables_string+= f' {det.name}_I {det.name}_ERR'
+    lines.append(f'# yvars:{det_string}')
+    lines.append(f'# xlimits:{xlimits}')
+    lines.append(f'# filename: mccode.dat')
+    lines.append(f'# variables: {scan_name.replace(",","")}{variables_string}')
+    for row in dets_vals:
+        lines.append(f'{" ".join(row)}')
+
+    with open(var.sim_res/mcvar.dn/'mccode.dat', "w") as simfile:
+        for line in lines:
+            simfile.write("{}\n".format(line))
