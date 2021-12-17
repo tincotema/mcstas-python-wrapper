@@ -29,45 +29,46 @@ def execute(command, errormsg, successmsg, print_command=True):
         print(run_return.stderr)
         sys.exit(errormsg)
     else:
+        #print(run_return.stdout)
         print(f"{successmsg}\n")
     return run_return
 
 def valid_config(var):
     #check dirs
-    if not isdir(var.p_local):
-        sys.exit(f"the given local working directory '{var.p_local}' dose not exist")
-    if not isdir(var.p_server):
-        sys.exit(f"the given server working directory '{var.p_server}' dose not exist\n\
+    if not isdir(var['p_local']):
+        sys.exit(f"the given local working directory '{var['p_local']}' dose not exist")
+    if not isdir(var['p_server']):
+        sys.exit(f"the given server working directory '{var['p_server']}' dose not exist\n\
                  if you dont intend to use the ssh feature, just set it so valid path")
-    if isabs(var.sim_res):
-        if not isdir(var.sim_res):
-            sys.exit(f"the given simulation result directory '{var.sim_res}' dose not exist")
+    if isabs(var['sim_res']):
+        if not isdir(var['sim_res']):
+            sys.exit(f"the given simulation result directory '{var['sim_res']}' dose not exist")
     else:
-        if not isdir(var.p_local/var.sim_res):
-            os.mkdir(var.p_local/var.sim_res)
-            print(f"created simulation result directory '{var.sim_res}' in the local working directory")
-    if isabs(var.sim_res): #making shure var.sim_res is allways a absolute path
+        if not isdir(var['p_local']/var['sim_res']):
+            os.mkdir(var['p_local']/var['sim_res'])
+            print(f"created simulation result directory '{var['sim_res']}' in the local working directory")
+    if isabs(var['sim_res']): #making shure var['sim_res'] is allways a absolute path
         pass
     else:
-        var.sim_res = var.p_local/var.sim_res
+        var['sim_res'] = var['p_local']/var['sim_res']
 
-    mcstas = which(var.mcstas)
+    mcstas = which(var['mcstas'])
     if not mcstas:
-        sys.exit(f"\nMcStas is not installed or the Path is inocrrect: {var.mcstas}")
+        sys.exit(f"\nMcStas is not installed or the Path is inocrrect: {var['mcstas']}")
     if islink(mcstas):
-        var.mcstas = os.readlink(mcstas)
+        var['mcstas'] = os.readlink(mcstas)
 
 def valid_mcconfig(var,mcvar):
-    if not mcvar.instr_file.split('.')[1] == "instr":
+    if not mcvar['instr_file'].split('.')[1] == "instr":
         sys.exit(f"\nthe given instrument file has not the correct ending:\
-                 \nexpected: {mcvar.instr_file.split('.')[0]}.instr\
-                 \ngot: {mcvar.instr_file}\
+                 \nexpected: {mcvar['instr_file'].split('.')[0]}.instr\
+                 \ngot: {mcvar['instr_file']}\
                  \nplease make shure to give a valid instrument file")
 
-    if not isfile(var.p_local/mcvar.instr_file):
-        sys.exit(f"\nthe instrument file '{mcvar.instr_file}' dose not exist")
+    if not isfile(var['p_local']/mcvar['instr_file']):
+        sys.exit(f"\nthe instrument file '{mcvar['instr_file']}' dose not exist")
 
-    if var.mpi == 0:
+    if var['mpi'] == 0:
         # test if gcc exists
         if not which("gcc"):
             sys.exit(f"\ngcc is not installed. please install it")
@@ -109,26 +110,29 @@ def encode_files_to_local_encoding(file_or_dir_list, output_dir):
 # mcstas -t --verbose -o outputfile instrfile (-I componentdir)
 def run_mcstas(var, mcvar):
     # create output name
-    instr_c_file = mcvar.instr_file.split('.')[0] + ".c"
+    instr_c_file = mcvar['instr_file'].split('.')[0] + ".c"
     temp_dir = 'temp_encoding'
     if os.name=='nt':
-        os.environ['MCSTAS'] = dirname(var.mcstas)+'/../lib/'
-        if not isdir(var.p_local/temp_dir):
-            os.mkdir(var.p_local/temp_dir)
-        encode_files_to_local_encoding([var.p_local/mcvar.instr_file, var.p_local, var.componentdir], var.p_local/temp_dir)
-        run_string = f"{var.mcstas} -t --verbose -o {var.p_local/instr_c_file} {basename(mcvar.instr_file)} -I {var.p_local/temp_dir} "
+        os.environ['MCSTAS'] = dirname(var['mcstas'])+'/../lib/'
+        if not isdir(var['p_local']/temp_dir):
+            os.mkdir(var['p_local']/temp_dir)
+        encode_files_to_local_encoding([var['p_local']/mcvar['instr_file'], var['p_local'], var['componentdir']], var['p_local']/temp_dir)
+        run_string = f"{var['mcstas']} -t --verbose -o {var['p_local']/instr_c_file} {basename(mcvar['instr_file'])} -I {var['p_local']/temp_dir} "
         # exectue the run_string and capture the output
         print(f"runing: {run_string}")
-        run_return = sp.run(run_string, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE, cwd=var.p_local/temp_dir)
-        for file in os.listdir(f"{var.p_local/temp_dir}"):
-            os.remove(f"{var.p_local/temp_dir/file}")
-        os.rmdir(f"{var.p_local/temp_dir}")
+        run_return = sp.run(run_string, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE, cwd=var['p_local']/temp_dir)
+        for file in os.listdir(f"{var['p_local']/temp_dir}"):
+            os.remove(f"{var['p_local']/temp_dir/file}")
+        os.rmdir(f"{var['p_local']/temp_dir}")
     else:
         # create run_string
-        run_string = f"{var.mcstas} -t --verbose -o {var.p_local/instr_c_file} {var.p_local/mcvar.instr_file} -I {var.p_local} "
+        run_string = f"{var['mcstas']} -t --verbose -o {var['p_local']/instr_c_file} {var['p_local']/mcvar['instr_file']} -I {var['p_local']} "
         #if a extra Component Dir is given add the option to the compile command
-        if var.componentdir != "":
-            run_string = run_string + f"-I {var.componentdir} "
+        if var['componentdir'] != "":
+            if isabs(var['componentdir']):
+                run_string = run_string + f"-I {var['componentdir']} "
+            else:
+                run_string = run_string + f"-I {var['p_local']/var['componentdir']} "
         # exectue the run_string and capture the output
         print(f"runing: {run_string}")
         run_return = sp.run(run_string, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE)
@@ -142,47 +146,48 @@ def run_mcstas(var, mcvar):
 
 # gcc (mpicc) -o p_local/reseda.out p_local/reseda.c -lm (-DUSE_MPI) -g -O2 -lm -std=c99
 def run_compiler(var,mcvar, cflags=""):
-    instr_c_file = mcvar.instr_file.split('.')[0] + ".c"
+    instr_c_file = mcvar['instr_file'].split('.')[0] + ".c"
     if os.name=='nt':
-        instr_out_file = mcvar.instr_file.split('.')[0] + ".exe"
+        instr_out_file = mcvar['instr_file'].split('.')[0] + ".exe"
     else:
-        instr_out_file = mcvar.instr_file.split('.')[0] + ".out"
+        instr_out_file = mcvar['instr_file'].split('.')[0] + ".out"
     #check if mpi is enabled
-    if var.mpi == 0:
+    if var['mpi'] == 0:
         run_string = f"gcc "
     else:
         if os.name=='nt':
-            run_string = f"{dirname(var.mcstas)}/mpicc.bat -DUSE_MPI "
+            run_string = f"{dirname(var['mcstas'])}/mpicc.bat -DUSE_MPI "
         else:
             run_string = f"mpicc -DUSE_MPI "
-    run_string = run_string + f"-o {var.p_local/instr_out_file} {var.p_local/instr_c_file} -lm -g -O2 -std=c99 {cflags}"
+    run_string = run_string + f"-o {var['p_local']/instr_out_file} {var['p_local']/instr_c_file} -lm -g -O2 -std=c99 {cflags}"
     # exectue the run_string and capture the output
     execute(run_string, "An error occurred while running the C Compiler", "C compiler done")
 
 # (mpirun -np 2) instr.out -n -d var=value
 def run_instrument(var,mcvar,var_list):
-    sys.path.append(f'{os.path.dirname(var.mcstas)}/../tools/Python/mcrun')
+    sys.path.append(f"{os.path.dirname(var['mcstas'])}/../tools/Python/mcrun")
     from mccode import McStasResult
     errormsg = "The Simmulation Failed"
     successmsg = "The simmulation compleated successfully"
-    no_use_vars = ["scan", "n", "dn", "instr_file"]
+    no_use_vars = ["scan", "n", "sim", "instr_file"]
     if os.name=='nt':
-        instr_out_file = mcvar.instr_file.split('.')[0] + ".exe"
+        instr_out_file = mcvar['instr_file'].split('.')[0] + ".exe"
     else:
-        instr_out_file = mcvar.instr_file.split('.')[0] + ".out"
+        instr_out_file = mcvar['instr_file'].split('.')[0] + ".out"
     params = ''
     scan_var = []
     res_list = []
     #check if mpi is enabled
-    if var.mpi == 0:
-        run_string = f"{var.p_local/instr_out_file} -n {str(mcvar.n)} "
+    if var['mpi'] == 0:
+        run_string = f"{var['p_local']/instr_out_file} -n {str(mcvar['n'])} "
     else:
         if os.name=='nt':
-            run_string = f"mpiexec -np {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
+            run_string = f"mpiexec -np {var['mpi']} {var['p_local']/instr_out_file} -n {str(mcvar['n'])} "
         else:
-            run_string = f"mpirun --use-hwthread-cpus -np {var.mpi} {var.p_local/instr_out_file} -n {str(mcvar.n)} "
+            run_string = f"mpirun --use-hwthread-cpus -np {var['mpi']} {var['p_local']/instr_out_file} -n {str(mcvar['n'])} "
     # parsing the parameters and checking if a scan is required
-    for var_name, var_value in mcvar.__dict__.items():
+    for var_name, var_value in mcvar.items():
+    #for var_name, var_value in mcvar.__dict__.items():
         if not (var_name in no_use_vars):
             if isinstance(var_value, Scan):
                 scan_var = [var_name, var_value]
@@ -193,7 +198,7 @@ def run_instrument(var,mcvar,var_list):
         params = ''
         dets_vals = []
         #creating main result directory
-        os.mkdir(var.sim_res/mcvar.dn)
+        os.mkdir(var['sim_res']/mcvar['sim'])
         for name in var_list[0]:
             no_use_vars.append(name)
         for i in range(len(var_list)-1):
@@ -202,13 +207,14 @@ def run_instrument(var,mcvar,var_list):
             for j, name in enumerate(var_list[0]):
                 params = params + f"{name}={var_list[i+1][j]} "
                 value_list.append(str(var_list[i+1][j]))
-            for var_name, var_value in mcvar.__dict__.items():
+            for var_name, var_value in mcvar.items():
+            #for var_name, var_value in mcvar.__dict__.items():
                 if not (var_name in no_use_vars):
                     if isinstance(var_value, Scan):
                         sys.exit("VALUE ERROR: You can not have a Scan and the list opiton at the same time.\n Exiting")
                     else:
                         params = params + f"{var_name}={var_value} "
-            final_run_string = run_string + f"-d {str(var.sim_res/mcvar.dn/str(i))} {params} "
+            final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {params} "
 
             out = execute(final_run_string, errormsg, successmsg, print_command=False)
             dets=McStasResult(out.stdout).get_detectors()
@@ -216,7 +222,7 @@ def run_instrument(var,mcvar,var_list):
                 print(f'det.intensity: {det.intensity}, det.error: {det.error}')
                 value_list.append(str(det.intensity))
                 value_list.append(str(det.error))
-            res_list.append(var.sim_res/mcvar.dn/str(i))
+            res_list.append(var['sim_res']/mcvar['sim']/str(i))
             dets_vals.append(value_list)
         create_sim_file(dets, var, mcvar, var_list)
         create_dat_file(dets, var, mcvar, var_list, dets_vals)
@@ -224,7 +230,7 @@ def run_instrument(var,mcvar,var_list):
     elif scan_var:
         #scan
         #creating main result directory
-        os.mkdir(var.sim_res/mcvar.dn)
+        os.mkdir(var['sim_res']/mcvar['sim'])
         dets_vals = []
         #scanning all points
         print(f"running: {run_string} {scan_var[0]}={scan_var[1].mc} ")
@@ -232,21 +238,21 @@ def run_instrument(var,mcvar,var_list):
             value_list=[str(scan_var[1].absolute_value(i))]
             print(f"step: {scan_var[0]}={scan_var[1].absolute_value(i)}")
             i_params = params + f"{scan_var[0]}={scan_var[1].absolute_value(i)} "
-            final_run_string = run_string + f"-d {str(var.sim_res/mcvar.dn/str(i))} {i_params} "
+            final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {i_params} "
 
             out = execute(final_run_string, errormsg, successmsg, print_command=False)
             dets=McStasResult(out.stdout).get_detectors()
             for det in dets:
                 value_list.append(str(det.intensity))
                 value_list.append(str(det.error))
-            res_list.append(var.sim_res/mcvar.dn/str(i))
+            res_list.append(var['sim_res']/mcvar['sim']/str(i))
             dets_vals.append(value_list)
         create_sim_file(dets, var, mcvar, var_list)
         create_dat_file(dets, var, mcvar, var_list, dets_vals)
     else:
-        final_run_string = run_string + f"-d {str(var.sim_res/mcvar.dn)} {params} "
+        final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim'])} {params} "
         execute(final_run_string, errormsg, successmsg)
-        res_list.append(var.sim_res/mcvar.dn)
+        res_list.append(var['sim_res']/mcvar['sim'])
     return res_list
 
 def psave(obj, file_path):#saves the given object as a pickle dump in the given file (file gets created)
@@ -279,15 +285,16 @@ def save_var_list(var_list, filename):
             w.writerow(var_list[i])
 
 def check_scan(var, mcvar, msg): #ignore for now, is something i might implement later fully
-    dir_num = len(os.listdir(var.sim_res/mcvar.dn))
-    if dir_num-4 == mcvar.scan.N:
+    dir_num = len(os.listdir(var['sim_res']/mcvar['sim']))
+    if dir_num-4 == mcvar['scan'].N:
         return True
     else:
-        msg = msg + f"the number of result folders dont correspont to the number of steps (#Dir:{dir_num} vs scan.N:{mcvar.scan.N})\n"
+        msg = msg + f"the number of result folders dont correspont to the number of steps (#Dir:{dir_num} vs scan.N:{mcvar['scan'].N})\n"
         return False
 
 def is_scan(mcvar):
-    for var_name, var_value in mcvar.__dict__.items():
+    for var_name, var_value in mcvar.items():
+    #for var_name, var_value in mcvar.__dict__.items():
         if not var_name == "scan" and isinstance(var_value,Scan):
             return var_name
     return False
@@ -295,17 +302,17 @@ def is_scan(mcvar):
 def check_for_detector_output(var, mcvar, var_list):
     if var_list:
         for i in range(len(var_list)-1):
-            if not os.path.isdir(var.sim_res/mcvar.dn/str(i)):
-                print(f"the mcstas output dir {mcvar.dn}/{i} dose not exist.\nexiting")
+            if not os.path.isdir(var['sim_res']/mcvar['sim']/str(i)):
+                print(f"the mcstas output dir {mcvar['sim']}/{i} dose not exist.\nexiting")
                 exit()
     elif is_scan(mcvar):
-        for i in range(mcvar.scan.N):
-            if not os.path.isdir(var.sim_res/mcvar.dn/str(i)):
-                print(f"the mcstas output dir {mcvar.dn}/{i} dose not exist.\nexiting")
+        for i in range(mcvar['scan'].N):
+            if not os.path.isdir(var['sim_res']/mcvar['sim']/str(i)):
+                print(f"the mcstas output dir {mcvar['sim']}/{i} dose not exist.\nexiting")
                 exit()
     else:
-        if not os.path.isdir(var.sim_res/mcvar.dn):
-            print(f"the mcstas output dir {mcvar.dn} dose not exist.\n exiting")
+        if not os.path.isdir(var['sim_res']/mcvar['sim']):
+            print(f"the mcstas output dir {mcvar['sim']} dose not exist.\n exiting")
             exit()
         else:
             #print("all fine")
@@ -316,16 +323,16 @@ def get_result_path_from_input(var, mcvar, msg, args):# logic for retreiveng the
         if args.result_dir:
             return args.result_dir, msg
         else:
-            d = var.sim_res
+            d = var['sim_res']
             return sorted(d.iterdir(), key=os.path.getmtime, reverse=True)[0].name, msg
     if not args.result_dir:
-        name = mcvar.dn
+        name = mcvar['sim']
     else:
         name = args.result_dir
-    if os.path.isdir(var.sim_res/name):
+    if os.path.isdir(var['sim_res']/name):
             counter = 0
             new_name = name + "_" + str(counter)
-            while os.path.isdir(var.sim_res/new_name):
+            while os.path.isdir(var['sim_res']/new_name):
                 counter = counter + 1
                 new_name = name + "_" + str(counter)
             msg = f'####################\n new result directory is {new_name}\n####################\n'
@@ -334,10 +341,10 @@ def get_result_path_from_input(var, mcvar, msg, args):# logic for retreiveng the
 
 def mcplot(var,mcvar,msg='', mode='qt'):
     if mode == 'qt':
-        run_string= f"{dirname(var.mcstas)}/mcplot-pyqtgraph "
+        run_string= f"{dirname(var['mcstas'])}/mcplot-pyqtgraph "
     else:
-        run_string= f"{dirname(var.mcstas)}/mcplot-matplotlib "
-    run_string=run_string+f"{var.sim_res/mcvar.dn}"
+        run_string= f"{dirname(var['mcstas'])}/mcplot-matplotlib "
+    run_string=run_string+f"{var['sim_res']/mcvar['sim']}"
     sp.run(run_string, shell=True)
 
 
@@ -353,14 +360,15 @@ def create_sim_file(dets, var, mcvar,var_list):
         params = params[:-1] # removing last comma
         xlimits = f' {var_list[1][0]} {var_list[-1][0]}'
     else:
-        steps = mcvar.scan.N
+        steps = mcvar['scan'].N
         scan_name = is_scan(mcvar)
-        params = f' {scan_name} = {mcvar.scan.start}, {scan_name} = {mcvar.scan.stop}'
-        xlimits = f' {mcvar.scan.start} {mcvar.scan.stop}'
+        params = f" {scan_name} = {mcvar['scan'].start}, {scan_name} = {mcvar['scan'].stop}"
+        xlimits = f" {mcvar['scan'].start} {mcvar['scan'].stop}"
     lines = []
     lines.append(f'begin instrument:')
-    lines.append(f'  Creator: mcstas {execute(f"{var.mcstas} -v", "","",print_command=False).stdout.split(" ")[2]}')
-    lines.append(f'  Source: {mcvar.instr_file}')
+    version = execute(f"{var['mcstas']} -v", "","",print_command=False).stdout.split(" ")[2]
+    lines.append(f'  Creator: mcstas {version}')
+    lines.append(f"  Source: {mcvar['instr_file']}")
     lines.append(f'  Parameters: {scan_name}')
     lines.append(f'  Trace_enabled: no')
     lines.append(f'  Default_main: yes')
@@ -369,7 +377,7 @@ def create_sim_file(dets, var, mcvar,var_list):
     lines.append(f'')
     lines.append(f'begin simulation')
     lines.append(f'Date: {datetime.strftime(datetime.now(),"%a %b %d %H %M %Y")}')
-    lines.append(f'Ncount: {mcvar.n}')
+    lines.append(f"Ncount: {mcvar['n']}")
     lines.append(f'Numpoints: {steps}')
     lines.append(f'Param:{params}')
     lines.append(f'end simulation')
@@ -391,7 +399,7 @@ def create_sim_file(dets, var, mcvar,var_list):
     lines.append(f'variables: {scan_name.replace(",","")}{variables_string}')
     lines.append(f'end data')
 
-    with open(var.sim_res/mcvar.dn/'mccode.sim', "w") as simfile:
+    with open(var['sim_res']/mcvar['sim']/'mccode.sim', "w") as simfile:
         for line in lines:
             simfile.write("{}\n".format(line))
 
@@ -405,14 +413,14 @@ def create_dat_file(dets, var, mcvar, var_list, dets_vals):
         params = params[:-1] # removing last comma
         xlimits = f' {var_list[1][0]} {var_list[-1][0]}'
     else:
-        steps = mcvar.scan.N
+        steps = mcvar['scan'].N
         scan_name = is_scan(mcvar)
-        params = f' {scan_name} = {mcvar.scan.start}'
-        xlimits = f' {mcvar.scan.start} {mcvar.scan.stop}'
+        params = f" {scan_name} = {mcvar['scan'].start}"
+        xlimits = f" {mcvar['scan'].start} {mcvar['scan'].stop}"
     lines = []
-    lines.append(f"# Instrument-source: '{mcvar.instr_file}'")
+    lines.append(f"# Instrument-source: '{mcvar['instr_file']}'")
     lines.append(f'# Date: {datetime.strftime(datetime.now(),"%a %b %d %H %M %Y")}')
-    lines.append(f'# Ncount: {mcvar.n}')
+    lines.append(f"# Ncount: {mcvar['n']}")
     lines.append(f'# Numpoints: {steps}')
     lines.append(f'# Param:{params}')
     lines.append(f'# type: multiarray_1d({steps})')
@@ -432,6 +440,6 @@ def create_dat_file(dets, var, mcvar, var_list, dets_vals):
     for row in dets_vals:
         lines.append(f'{" ".join(row)}')
 
-    with open(var.sim_res/mcvar.dn/'mccode.dat', "w") as simfile:
+    with open(var['sim_res']/mcvar['sim']/'mccode.dat', "w") as simfile:
         for line in lines:
             simfile.write("{}\n".format(line))
