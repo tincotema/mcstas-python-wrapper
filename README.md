@@ -17,6 +17,16 @@ Added special function custom():
 ### 0.4.0:
 mcplot now fully supports all forms of scans 
 
+### 0.5.0:
+mcvariables and variables are no longer classes but dicts.
+This was done due to compatibility problems between simmuations done from command line (mcpw_manager)
+and jupyter notebook
+
+Also mcvar.dn is now mcvar['sim']
+this should clarify the meaning of this variable as it is the name of a simulation run
+
+mcpw.mcstas_wrapper.is_scan renamed to mcpw.mcstas_wrapper.scan_name
+
 ## Requirements
 
 A mcstas instrument with all components
@@ -44,34 +54,34 @@ Processing the simmulation results.
 
 The Functionality is build around the two Classes variables and mcvariables.
 
-### Class variables
-Parameters of the class variables are global variables that apply to any simulation and contains the location of the main working directory.
+### Dict variables
+Parameters of the dict variables are global variables that apply to any simulation and contains the location of the main working directory.
 It is automatically generated with the 'mcpw_setup' command and is saved in local_var.py
+It belongs to a single host
 
-The typical name vor the initialized class is 'var'.
+The typical name vor this dict is 'var'.
 
-The class variables you will find the most usefull will be:
+The dict entrys you will find the most usefull will be:
 
--var.p_local The Local Working directory (Absolute Path; a Path object)
--var.sim_res The simulation result folder in your p_local dir.
+-var['p_local'] The Local Working directory (Absolute Path; a Path object)
+-var['sim_res'] The simulation result folder in your p_local dir.
 
 All other variables should not be necessary to use in your code.
 
 
-### Class mcvariables
-Parameters of the class mcvariables contain all important values to run a simulation.
+### Dict mcvariables
+Parameters of the dict mcvariables contain all important values to run a simulation.
 The mcpw_setup command will create it from the given instrument file and put it into instrument_name.py file.
 
-The typical name vor the initialized class is 'mcvar'.
+The typical name vor the dict is 'mcvar'.
 
-The class variables you will find the most usefull will be:
+The dict entrys you will find the most usefull will be:
 
--mcvar.dn The drectory(name) of a particular simulation
--mcvar.sweep see Sweep Class below
+-mcvar['sim'] The directory(name) of a particular simulation
 
-All other variables should be self explanatory
+All other entrys should be self explanatory
 
-If one of the variables of your instrument is set to self.scan, the program will run as many simulation steps as defined in the scan variable (see Scan Class below).
+If one of the variables is an object of the Scan class, the program will run as many simulation steps as defined in the scan variable (see Scan Class below).
 You can only scan one variable at a time with this method. To scan multiple variables at once see 'Scaning with csv file'.
 
 
@@ -141,8 +151,6 @@ For more advanced usecases have a look at mcpw_manager --help .
 
 ### Scan Class
 
-The mcvariables class contains a variable called scan that is object of the Scan class.
-
 The Scan class is used to simplify the process of runing a number of simulations over a range of one variable.
 If you want to change more than one variable per step, use the csv file function. 
 
@@ -195,7 +203,7 @@ You will get a printout for your mcvariable class. copy the section into the nex
 
 Now var and mcvar should be initialized and you can run a simmulation with:
 
-	mcvar, res = simulate(var, mcvar, dn='bla'[,var_list=[], var_list_csv=PATH])
+	mcvar, res = simulate(var, mcvar, sim='bla'[,var_list=[], var_list_csv=PATH])
 
 This function returns the used mcvariables and a list of result directorys where the simulation results are saved.
 If the command is called a second time with the same value for dn, the mcvariables and result directorys for this dn will be loaded end returned.
@@ -215,26 +223,28 @@ This function takes the place of the run_instrument() function as well as all sa
 ## List of usefull functions
 ### General functions
 
-pickle binary dump:
-
 	mcpw.mcstas_wrapper.psave(obj, file_path)
-
-pickle binary load (returns a object):
+pickle binary dump
 
 	mcpw.mcstas_wrapper.pload(file_path)
+pickle binary load (returns a object)
 
-function to determen if a set of mcvariables triggers a Scan:
+	mcpw.mcstas_wrapper.scan_name(mcvar)
+function to determen if a set of mcvariables triggers a Scan
+returns the name of the variable to scan or 'False'
+
+	mcpw.mcstas_wrapper.scan(mcvar)
+returns the scan object if one was set in the mcvariable dict otherwise 'None'
 	
-	mcpw.mcstas_wrapper.if_scan(mcvar)
-
-the original mcplot function:
 
 	mcpw.mcstas_wrapper.mcpot(var,mcvar[, mode='qt'])
+the original mcplot function
+
 
 ###Functions explicit for jupyter notebook:
 Function returning mcvariables from simmulation:
 
-	load_mcvariables(var, dn='')
+	load_mcvariables(var, sim='')
 
 ## Command Usage
 

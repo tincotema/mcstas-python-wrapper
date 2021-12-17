@@ -64,40 +64,41 @@ def main():
         exit(1)
 
 
-    # importing var and mcvar from local_var.py and reseda.py files
+    # importing var and mcvar from local_var['port']py and reseda.py files
     sys.path.append(os.getcwd())
     sys.path.append(os.path.dirname(args.python_file))
-    from local_var import variables
+    from local_var import variables  as var
     #initializing and validating local vars
-    var = variables()
+    #var = variables()
     valid_config(var)
 
     # adding local working directory to PATH
-    sys.path.append(var.p_local)
+    sys.path.append(var['p_local'])
 
     # adding pyhton file location to PATH
     #importing python_file as module
     pyinstr = import_module(f"{os.path.basename(args.python_file).split('.')[0]}")
     # pulling relevant functions and classes from python file
     mcvariables = vars(pyinstr)['mcvariables']
+    mcvar = vars(pyinstr)['mcvariables']
     analyse = vars(pyinstr)['analyse']
     post_simulation = vars(pyinstr)['post_simulation']
     pre_simulation = vars(pyinstr)['pre_simulation']
     # initializing mcvariables class
-    mcvar = mcvariables()
+    #mcvar = mcvariables()
     var_list = []
     if args.list:
         if not isabs(args.list):
-            if not isfile(var.p_local/args.list):
-                sys.exit(f"could not find {args.list} in {var.p_local}")
+            if not isfile(var['p_local']/args.list):
+                sys.exit(f"could not find {args.list} in {var['p_local']}")
         else:
-            if not isfile(var.p_local/args.list):
+            if not isfile(var['p_local']/args.list):
                 sys.exit(f"could not find {args.list}")
         try:
             if isabs(args.list):
                 var_list = load_var_list(args.list)
             else:
-                var_list = load_var_list(var.p_local/args.list)
+                var_list = load_var_list(var['p_local']/args.list)
         except Exception as e:
             sys.exit(f"could not import {args.list}. an exception occurred:\n{e}")
 
@@ -107,13 +108,13 @@ def main():
         # Fallback to --help.
         parser.print_help()
     else:
-        (mcvar.dn,msg) = get_result_path_from_input(var, mcvar, msg, args) # logic for retreiveng the correct name for the result foulder
+        (mcvar["sim"],msg) = get_result_path_from_input(var, mcvar, msg, args) # logic for retreiveng the correct name for the result foulder
         valid_mcconfig(var,mcvar)
         if args.func == 'analyse':
             try:
-                var_list = load_var_list(var.sim_res/mcvar.dn/'var_list')
+                var_list = load_var_list(var['sim_res']/mcvar["sim"]/'var_list')
             except: var_list = []
-            mcvar = pload(var.sim_res/mcvar.dn/'variables') #loading the correct variables
+            mcvar = pload(var['sim_res']/mcvar["sim"]/'variables') #loading the correct variables
             valid_mcconfig(var,mcvar)
             check_for_detector_output(var,mcvar, var_list)
             analyse(var, mcvar, var_list)                             #call analyse, defined in reseda.py
@@ -124,18 +125,18 @@ def main():
             var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
             run_instrument(var,mcvar, var_list)
             check_for_detector_output(var,mcvar,var_list)
-            save_var_list(var_list, var.sim_res/mcvar.dn/'var_list')  #save mcstas variables
-            psave(mcvar, var.sim_res/mcvar.dn/'variables')  #save mcstas variables
+            save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list')  #save mcstas variables
+            psave(mcvar, var['sim_res']/mcvar["sim"]/'variables')  #save mcstas variables
             post_simulation(var, mcvar, var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
-            sp.run(['tar', '-cf' '{}/{}.tar'.format(var.sim_res, mcvar.dn), var.sim_res/mcvar.dn]) #compress data
+            sp.run(['tar', '-cf' '{}/{}.tar'.format(var['sim_res'], mcvar["sim"]), var['sim_res']/mcvar["sim"]]) #compress data
 
         elif args.func == 'remote':#use this if you want to run the simulation on a remote machine (setup has to be done beforhand)
-            sp.run(['scp', '-r', '-P', str(var.port), var.instr_file, '{}:{}'.format(var.server, var.p_server)])#copy mcstas-instrument to remote
-            sp.run(['scp', '-r', '-P', str(var.port), 'manager.py', '{}:{}'.format(var.server, var.p_server)])#copy this file to remote
-            sp.run(['scp', '-r', '-P', str(var.port), 'reseda.py', '{}:{}'.format(var.server, var.p_server)])#copy this file to remote
-            sp.run(['ssh' , '-p', str(var.port), var.server, 'cd {}; python {}manager.py server {}'.format(var.p_server, var.p_server,mcvar.dn)])#run this file with server atribute remote
-            sp.run(['scp', '-l', str(var.rate), '-r', '-P', str(var.port), '{}:{}.tar'.format(var.server, var.p_server/var.sim_res/mcvar.dn), var.p_local])#download data from remote
-            sp.run(['tar', '-xf', '{}.tar'.format(mcvar.dn)])#decompress data
+            sp.run(['scp', '-r', '-P', str(var['port']), var['instr_file'], '{}:{}'.format(var['server'], var['p_server'])])#copy mcstas-instrument to remote
+            sp.run(['scp', '-r', '-P', str(var['port']), 'manager.py', '{}:{}'.format(var['server'], var['p_server'])])#copy this file to remote
+            sp.run(['scp', '-r', '-P', str(var['port']), 'reseda.py', '{}:{}'.format(var['server'], var['p_server'])])#copy this file to remote
+            sp.run(['ssh' , '-p', str(var['port']), var['server'], 'cd {}; python {}manager.py server {}'.format(var['p_server'], var['p_server'],mcvar["sim"])])#run this file with server atribute remote
+            sp.run(['scp', '-l', str(var['rate']), '-r', '-P', str(var['port']), '{}:{}.tar'.format(var['server'], var['p_server']/var['sim_res']/mcvar["sim"]), var['p_local']])#download data from remote
+            sp.run(['tar', '-xf', '{}.tar'.format(mcvar["sim"])])#decompress data
 
         elif args.func == 'local':#use this to run the script localy
             run_mcstas(var,mcvar)
@@ -143,8 +144,8 @@ def main():
             var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
             run_instrument(var,mcvar,var_list)
             check_for_detector_output(var,mcvar,var_list)
-            save_var_list(var_list, var.sim_res/mcvar.dn/'var_list')  #save mcstas variables
-            psave(mcvar, var.sim_res/mcvar.dn/'variables')  #save mcstas variables
+            save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list')  #save mcstas variables
+            psave(mcvar, var['sim_res']/mcvar["sim"]/'variables')  #save mcstas variables
             post_simulation(var, mcvar,var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
 
         elif args.func == 'full':
@@ -153,8 +154,8 @@ def main():
             var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
             run_instrument(var,mcvar,var_list)
             check_for_detector_output(var,mcvar,var_list)
-            save_var_list(var_list, var.sim_res/mcvar.dn/'var_list')  #save mcstas variables
-            psave(mcvar, var.sim_res/mcvar.dn/'variables')  #save mcstas variables
+            save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list')  #save mcstas variables
+            psave(mcvar, var['sim_res']/mcvar["sim"]/'variables')  #save mcstas variables
             post_simulation(var, mcvar, var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
             analyse(var, mcvar,var_list)                                               #call analyse, defined in reseda.py
 

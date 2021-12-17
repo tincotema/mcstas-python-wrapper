@@ -40,8 +40,31 @@ def create_local_var_lines(args):
 
     return class_variables_lines
 
+def create_local_var_dict(args):
+    print("generating class variables")
+    class_variables_lines = []
+    class_variables_lines.append("from pathlib import Path             #needed for the path logic")
+    class_variables_lines.append("variables = {")
+    class_variables_lines.append("    #directorys")
+    class_variables_lines.append(f'    "p_server"     : Path("/"),')
+    class_variables_lines.append(f'    "p_local"      : Path("{args.working_dir}"),')
+    class_variables_lines.append(f'    "sim_res"      : "{args.output_dir}",')
+    class_variables_lines.append(f"    #ssh related variables")
+    class_variables_lines.append(f'    "rate"         : 32000, #scp transfairrate in bits/s')
+    class_variables_lines.append(f'    "port"         : 22,')
+    class_variables_lines.append(f'    "server"       : "",')
+    class_variables_lines.append(f"    #mcstas location")
+    class_variables_lines.append(f'    "mcstas"       : "{args.mcstas}",')
+    class_variables_lines.append(f'    "componentdir" : "{args.component_dir}",')
+    class_variables_lines.append(f"    #mcstas variables")
+    class_variables_lines.append(f'    "mpi"          : {args.mpi},')
+    class_variables_lines.append(f"    #additional c compiler flags,")
+    class_variables_lines.append(f'    "cflags"       : ""')
+    class_variables_lines.append('    }')
+
+    return class_variables_lines
 def create_local_var(args):
-    class_variables_lines = create_local_var_lines(args)
+    class_variables_lines = create_local_var_dict(args)
     with open(f"{args.working_dir}/local_var.py", "w") as pyfile:
         for line in class_variables_lines:
             print(line)
@@ -131,14 +154,48 @@ def create_class_mcvariables_lines(instrument):
             class_mcvariables_lines.append(f"        # {line}")
 
     return class_mcvariables_lines
+def create_mcvar_dict(instrument):
+    var_lines = []
+    with open(instrument) as mcfile:
+        befor_define_section = True
+        in_define_section = False
+        for line in mcfile:
+            if befor_define_section:
+                if line.startswith("DEFINE INSTRUMENT"):
+                    befor_define_section = False
+                    in_define_section = True
+            if in_define_section:
+                if line == ")\n":
+                    in_define_section = False
+                if (line != "(\n") and not line.startswith("DEFINE INSTRUMENT") and line !="\n" and line !=")\n":
+                    var_lines.append(line.replace("\t","    ").replace("\n","").replace(","," ").replace("//","#").lstrip().split(' ',1)[1])
+
+    class_mcvariables_lines = []
+    class_mcvariables_lines.append("mcvariables = { #dict to hold the variables needed to run the mcstas simulation")
+    class_mcvariables_lines.append("    # allways needed")
+    class_mcvariables_lines.append('    "sim"            : "default",')
+    class_mcvariables_lines.append('    "n"              : 1000000,')
+    class_mcvariables_lines.append(f'    "instr_file"     : "{basename(instrument)}",  #the name of the instrument file, must be located in p_server/p_local')
+    class_mcvariables_lines.append('    #__________________________________________________________________________#')
+    class_mcvariables_lines.append('    #variables defined in the DEFINE INSTRUMENT section of the mcstas instrument')
+    for line in var_lines:
+        if line.__contains__("="):
+            if line.__contains__("#"):
+                class_mcvariables_lines.append(f'    "{line.split("=")[0].rstrip()}" : {line.split("=")[1].lstrip().split(" ")[0]}, #{line.split("#")[1]}')
+            else:
+                class_mcvariables_lines.append(f'    "{line.split("=")[0].rstrip()}" : {line.split("=")[1].lstrip().split(" ")[0]},')
+        else:
+            class_mcvariables_lines.append(f"    # {line}")
+    class_mcvariables_lines.append('    }')
+    return class_mcvariables_lines
 
 def create_header_lines():
     header_lines = []
     header_lines.append(f'# import section')
-    header_lines.append(f'from mcpw.mcstas_wrapper import Scan, mcplot')
+    header_lines.append(f'from mcpw.mcstas_wrapper import Scan, scan_name, scan, mcplot')
     header_lines.append(f'')
     header_lines.append(f'#this file must allways contain:')
-    header_lines.append(f'#class mcvariables() a class containing all parameters for the mcstas instrument file')
+    header_lines.append(f'#mcvariables: a dict containing all parameters for the mcstas instrument file')
     header_lines.append(f'#def pre_simulation(var,mcvar) a funcition containing all functions that should be exectuded directly before esecuting the instrument. for example to play with variables. dose not influence the compilers')
     header_lines.append(f'#def post_simulation(var,mcvar) a funcition containing all functions that should be exectuded directly after the simulation has been finished. for example to post process the simulation results permanently')
     header_lines.append(f'#def analyse(var,mcvar) a funcition containing all functions that should be exectuded to analyse a finished mcstas simulation')
@@ -193,7 +250,8 @@ def create_python_file(args):
     header_lines = create_header_lines()
     main_lines = create_main_lines()
     print(f"reading {args.instrument}")
-    class_mcvariables_lines = create_class_mcvariables_lines(f"{args.working_dir}/{args.instrument}")
+    #class_mcvariables_lines = create_class_mcvariables_lines(f"{args.working_dir}/{args.instrument}")
+    class_mcvariables_lines = create_mcvar_dict(f"{args.working_dir}/{args.instrument}")
 
     with open(f"{args.working_dir}/{args.instrument.split('.')[0]}.py", "w") as pyfile:
         for line in header_lines:
