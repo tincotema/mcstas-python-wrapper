@@ -229,9 +229,10 @@ def run_instrument(var,mcvar,var_list):
             final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {params} "
 
             out = execute(final_run_string, errormsg, successmsg, print_command=False)
+            temp = sys.stdout
             sys.stdout = DummyFile()
             dets=McStasResult(out.stdout).get_detectors()
-            sys.stdout  =sys.__stdout__
+            sys.stdout = temp
             for det in dets:
                 #print(f'det.intensity: {det.intensity}, det.error: {det.error}')
                 value_list.append(str(det.intensity))
@@ -255,9 +256,10 @@ def run_instrument(var,mcvar,var_list):
             final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {i_params} "
 
             out = execute(final_run_string, errormsg, successmsg, print_command=False)
+            temp = sys.stdout
             sys.stdout = DummyFile()
             dets=McStasResult(out.stdout).get_detectors()
-            sys.stdout  =sys.__stdout__
+            sys.stdout = temp
             for det in dets:
                 value_list.append(str(det.intensity))
                 value_list.append(str(det.error))

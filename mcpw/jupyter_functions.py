@@ -7,7 +7,7 @@ import re
 from os.path import isdir, isfile, isabs, islink
 from mcpw.setup_tools import create_local_var, create_mcvar_dict
 from mcpw.mcstas_wrapper import run_mcstas, run_compiler,\
-                                run_instrument, is_scan,\
+                                run_instrument, scan_name,\
                                 check_for_detector_output,\
                                 psave, pload, which, valid_config,\
                                 save_var_list, scan
@@ -37,7 +37,7 @@ def simulate(var, mcvar, var_list=[], var_list_csv='', sim='', remote=False): #s
     if os.path.isdir(var['sim_res']/sim):
         print('A Simulation with this result foder name allrady exists, skip Simulation.\n')
         res_list = []
-        if is_scan(mcvar):
+        if scan_name(mcvar):
             for i in range(scan(mcvar).N):
                 res_list.append(var['sim_res']/mcvar['sim']/str(i))
         else:
@@ -72,7 +72,7 @@ def simulate(var, mcvar, var_list=[], var_list_csv='', sim='', remote=False): #s
         sp.run(['tar', '-xf', '{}.tar'.format(mcvar['sim'])])#decompress data
         print('remote simulation successfully\n')
         res_list = []
-        if is_scan(mcvar):
+        if scan_name(mcvar):
             for i in range(scan(mcvar).N):
                 res_list.append(var['sim_res']/mcvar['sim']/str(i))
         else:
@@ -166,8 +166,7 @@ def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_d
         create_local_var(args)
     # importing local variables
     sys.path.append(working_dir)
-    from local_var import variables
-    var = variables()
+    from local_var import variables as var
     valid_config(var)
     print("usefull variables: var['sim_res'] directory where simulation_results are saved.\n\
                         in combination with mcvar['sim'] you get the full path to your detector files:\n\
