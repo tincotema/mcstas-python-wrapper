@@ -16,30 +16,6 @@ class variables():
         #additional c compiler flags
         self.cflags      = ""
 '''
-def create_local_var_lines(args):
-    print("generating class variables")
-    class_variables_lines = []
-    class_variables_lines.append("from pathlib import Path             #needed for the path logic")
-    class_variables_lines.append("class variables():")
-    class_variables_lines.append("    def __init__(self):")
-    class_variables_lines.append("        #directorys")
-    class_variables_lines.append(f'        self.p_server     = Path("/")')
-    class_variables_lines.append(f'        self.p_local      = Path("{args.working_dir}")')
-    class_variables_lines.append(f'        self.sim_res      = "{args.output_dir}"')
-    class_variables_lines.append(f"        #ssh related variables")
-    class_variables_lines.append(f'        self.rate         = 32000 #scp transfairrate in bits/s')
-    class_variables_lines.append(f'        self.port         = 22')
-    class_variables_lines.append(f'        self.server       = ""')
-    class_variables_lines.append(f"        #mcstas location")
-    class_variables_lines.append(f'        self.mcstas       = "{args.mcstas}"')
-    class_variables_lines.append(f'        self.componentdir = "{args.component_dir}"')
-    class_variables_lines.append(f"        #mcstas variables")
-    class_variables_lines.append(f'        self.mpi          = {args.mpi}')
-    class_variables_lines.append(f"        #additional c compiler flags")
-    class_variables_lines.append(f'        self.cflags       = ""')
-
-    return class_variables_lines
-
 def create_local_var_dict(args):
     print("generating class variables")
     class_variables_lines = []
@@ -120,55 +96,37 @@ def check_args(args):
     if not isfile(args.working_dir +'/'+ args.instrument):
         sys.exit(f" the instrument file '{args.instrument}' is not located in the working directory '{args.working_dir}'")
 
-
-
-def create_class_mcvariables_lines(instrument):
-    var_lines = []
-    with open(instrument) as mcfile:
-        befor_define_section = True
-        in_define_section = False
-        for line in mcfile:
-            if befor_define_section:
-                if line.startswith("DEFINE INSTRUMENT"):
-                    befor_define_section = False
-                    in_define_section = True
-            if in_define_section:
-                if line == ")\n":
-                    in_define_section = False
-                if (line != "(\n") and not line.startswith("DEFINE INSTRUMENT") and line !="\n" and line !=")\n":
-                    var_lines.append(line.replace("\t","    ").replace("\n","").replace(","," ").replace("//","#").lstrip().split(' ',1)[1])
-
-    class_mcvariables_lines = []
-    class_mcvariables_lines.append("class mcvariables():#class to hold the variables needed to run the mcstas simulation")
-    class_mcvariables_lines.append("    def __init__(self):")
-    class_mcvariables_lines.append("        # allways needed")
-    class_mcvariables_lines.append('        self.dn             = "default"')
-    class_mcvariables_lines.append("        self.n              = 1000000")
-    class_mcvariables_lines.append(f'        self.instr_file     = "{basename(instrument)}"  #the name of the instrument file, must be located in p_server/p_local')
-    class_mcvariables_lines.append("        self.scan           = Scan(-0.1,0.1,'A', 3) # (begining, ending, Unit, number of steps)")
-    class_mcvariables_lines.append("        #variables defined in the DEFINE INSTRUMENT section of the mcstas instrument")
-    for line in var_lines:
-        if line.__contains__("="):
-            class_mcvariables_lines.append(f"        self.{line}")
-        else:
-            class_mcvariables_lines.append(f"        # {line}")
-
-    return class_mcvariables_lines
 def create_mcvar_dict(instrument):
     var_lines = []
     with open(instrument) as mcfile:
         befor_define_section = True
         in_define_section = False
         for line in mcfile:
-            if befor_define_section:
-                if line.startswith("DEFINE INSTRUMENT"):
-                    befor_define_section = False
-                    in_define_section = True
-            if in_define_section:
-                if line == ")\n":
-                    in_define_section = False
-                if (line != "(\n") and not line.startswith("DEFINE INSTRUMENT") and line !="\n" and line !=")\n":
-                    var_lines.append(line.replace("\t","    ").replace("\n","").replace(","," ").replace("//","#").lstrip().split(' ',1)[1])
+            try:
+                line = line.replace("\t", "    ").lstrip()
+                if befor_define_section:
+                    if line.startswith("DEFINE INSTRUMENT"):
+                        befor_define_section = False
+                        in_define_section = True
+                    if line.endswith(")\n"):
+                        for entry in line.split("(")[1].split(")")[0].split(","):
+                            var_lines.append(entry.split('='))
+                            var_lines[-1][0]=var_lines[-1][0].strip().split(' ')[-1]
+                            print(var_lines[-1])
+                        in_define_section = False
+                if in_define_section:
+                    if line == ")\n":
+                        in_define_section = False
+                    if (line != "(\n") and not line.startswith("DEFINE INSTRUMENT") and line !="\n" and line !=")\n":
+                        var_lines.append(line.replace("\t","    ").replace("\n","").replace(",","").replace(")","").replace("//","#").lstrip().split('='))
+                        var_lines[-1][0]=var_lines[-1][0].strip().split(' ')[-1]
+                        print(var_lines[-1])
+                    if line.replace("\n","").endswith(")"):
+                        in_define_section = False
+            except Exception as e:
+                print(e)
+                print(f"ERROR while parsing instrument variables: \n {line}\n\nPlease make shure the Define section of the instrument looks like this:\nDEFINE INSTRUMENT 'instrument'\n(\n  double x = 1.0,     //comment\n\n  int i = 1,          //comment\n  float f = 1.0,      //comment\n)")
+                exit()
 
     class_mcvariables_lines = []
     class_mcvariables_lines.append("mcvariables = { #dict to hold the variables needed to run the mcstas simulation")
@@ -179,13 +137,14 @@ def create_mcvar_dict(instrument):
     class_mcvariables_lines.append('    #__________________________________________________________________________#')
     class_mcvariables_lines.append('    #variables defined in the DEFINE INSTRUMENT section of the mcstas instrument')
     for line in var_lines:
-        if line.__contains__("="):
-            if line.__contains__("#"):
-                class_mcvariables_lines.append(f'    "{line.split("=")[0].rstrip()}" : {line.split("=")[1].lstrip().split(" ")[0]}, #{line.split("#")[1]}')
+        if len(line)==2:
+            if line[1].__contains__("#"):
+                print(line)
+                class_mcvariables_lines.append(f'    "{line[0]}" : {line[1].strip().split(" ")[0]}, #{line[1].split("#")[1]}')
             else:
-                class_mcvariables_lines.append(f'    "{line.split("=")[0].rstrip()}" : {line.split("=")[1].lstrip().split(" ")[0]},')
+                class_mcvariables_lines.append(f'    "{line[0]}" : {line[1].strip().split(" ")[0]},')
         else:
-            class_mcvariables_lines.append(f"    # {line}")
+            class_mcvariables_lines.append(f"    # {line[0].replace('#', '')}")
     class_mcvariables_lines.append('    }')
     return class_mcvariables_lines
 
@@ -252,7 +211,6 @@ def create_python_file(args):
     print(f"reading {args.instrument}")
     #class_mcvariables_lines = create_class_mcvariables_lines(f"{args.working_dir}/{args.instrument}")
     class_mcvariables_lines = create_mcvar_dict(f"{args.working_dir}/{args.instrument}")
-
     with open(f"{args.working_dir}/{args.instrument.split('.')[0]}.py", "w") as pyfile:
         for line in header_lines:
             print(line)
@@ -267,16 +225,4 @@ def create_python_file(args):
         for line in main_lines:
             print(line)
             pyfile.write("{}\n".format(line))
-
-
-
-
-
-
-
-
-
-
-
-
 
