@@ -7,6 +7,8 @@ import locale
 from shutil import copyfile, which
 import csv
 from datetime import datetime
+import re
+import numpy as np
 
 class DummyFile(object):
     def write(self, x): pass
@@ -255,9 +257,9 @@ def run_instrument(var,mcvar,var_list):
             i_params = params + f"{scan_var[0]}={scan_var[1].absolute_value(i)} "
             final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {i_params} "
 
-            out = execute(final_run_string, errormsg, successmsg, print_command=False)
             temp = sys.stdout
             sys.stdout = DummyFile()
+            out = execute(final_run_string, errormsg, successmsg, print_command=False)
             dets=McStasResult(out.stdout).get_detectors()
             sys.stdout = temp
             for det in dets:
@@ -461,3 +463,116 @@ def create_dat_file(dets, var, mcvar, var_list, dets_vals):
     with open(var['sim_res']/mcvar['sim']/'mccode.dat', "w") as simfile:
         for line in lines:
             simfile.write("{}\n".format(line))
+
+def return_detector(var,mcvar, detector, N=-1, plot=None):
+    path = ""
+    if N>=0:
+        path = var['sim_res']/mcvar['sim']/str(N)/detector
+        if not isfile(path):
+            sys.exit(f'error: File "{path}" dose not exist or is no file.')
+    else:
+        path = var['sim_res']/mcvar['sim']/detector
+        if not isfile(path):
+            sys.exit(f'error: File "{path}" dose not exist or is no file.')
+    readout =  np.squeeze(np.loadtxt(var['sim_res']/mcvar['sim']/detector))
+    with open(path) as det_file:
+        text = det_file.read()
+        if "array_2d" in text:
+            try:
+                freetext_pat = '.+'
+                comments = {}
+
+                m = re.search('\# title: (%s)' % freetext_pat, text)
+                comments["title"] = m.group(1)
+
+                '''# xlabel: Wavelength [AA]'''
+                m = re.search('\# xlabel: (%s)' % freetext_pat, text)
+                comments["xlabel"] = m.group(1)
+                '''# ylabel: Intensity'''
+                m = re.search('\# ylabel: (%s)' % freetext_pat, text)
+                comments["ylabel"] = m.group(1)
+                m = re.search('\# zlabel: (%s)' % freetext_pat, text)
+                comments["zlabel"] = m.group(1)
+
+                '''# xvar: L'''
+                m = re.search('\# xvar: (%s)' % freetext_pat, text)
+                comments["xvar"] = m.group(1)
+                '''# zvar: I '''
+                m = re.search('\# zvar: (%s)' % freetext_pat, text)
+                comments["zvar"] = m.group(1)
+                '''# yvar: (I,I_err)'''
+                m = re.search('\# yvar: (%s)' % freetext_pat, text)
+                comments["yvar"] = m.group(1)
+
+                '''
+                # xylimits: -30 30 -30 30
+                # xylimits: 0 5e+06 0.5 100
+                '''
+                m = re.search('\# xylimits: ([\d\.\-\+e]+) ([\d\.\-\+e]+) ([\d\.\-\+e]+) ([\d\.\-\+e]+)([\ \d\.\-\+e]*)', text)
+                comments["xylimits"] = (float(m.group(1)), float(m.group(2)), float(m.group(3)), float(m.group(4)))
+
+                '''# values: 6.72365e-17 4.07766e-18 4750'''
+                m = re.search('\# values: ([\d\-\+\.e]+) ([\d\-\+\.e]+) ([\d\-\+\.e]+)', text)
+                comments["vaules"] = (float(m.group(1)), float(m.group(2)),float(m.group(3)))
+                '''# statistics: X0=5.99569; dX=0.0266368;'''
+                m = re.search('\# statistics: X0=([\d\.\+\-e]+); dX=([\d\.\+\-e]+); Y0=([\d\.\+\-e]+); dY=([\d\.\+\-e]+);', text)
+                comments["statistics"] = f'X0={m.group(1)}; dX={m.group(2)}; Y0={m.group(3)}; dY={m.group(4)}'
+                '''# signal: Min=0; Max=1.20439e-18; Mean=4.10394e-21;'''
+                m = re.search('\# signal: Min=([\ \d\.\+\-e]+); Max=([\ \d\.\+\-e]+); Mean=([\ \d\.\+\-e]+);', text)
+                comments["signal"] = f'Min={m.group(1)}; Max={m.group(2)}; Mean={m.group(3)}'
+            except Exception as e:
+                print(e)
+                sys.exit(f"error while parsing detector {detctor}. Please ensure the format is correct.")
+            intensity = []
+            intensity.append(readout[0:int(len(readout)/3)])
+            intensity.append(readout[int(len(readout)/3):int(len(readout)*2/3)])
+            intensity.append(readout[int(len(readout)*2/3):int(len(readout))])
+            if plot:
+                plot.imshow(intensity[0], extent=comments["xylimits"])
+                plot.set_xlabel(comments["xlabel"])
+                plot.set_ylabel(comments["ylabel"])
+                plot.set_title(comments["title"])
+            return intensity, comments
+        if "array_1d" in text:
+            try:
+                freetext_pat = '.+'
+                comments = {}
+                m = re.search('\# title: (%s)' % freetext_pat, text)
+                comments["title"] = m.group(1)
+                '''# xlabel: Wavelength [AA]'''
+                m = re.search('\# xlabel: (%s)' % freetext_pat, text)
+                comments["xlabel"] = m.group(1)
+                '''# ylabel: Intensity'''
+                m = re.search('\# ylabel: (%s)' % freetext_pat, text)
+                comments["ylabel"] = m.group(1)
+
+                '''# xvar: L'''
+                m = re.search('\# xvar: ([\w]+)', text)
+                comments["xvar"] = m.group(1)
+                '''# xlimits: 5.5 6.5'''
+                m = re.search('\# xlimits: ([\d\.\-\+e]+) ([\d\.\-\+e]+)', text)
+                comments["xlimits"] = (float(m.group(1)),float(m.group(2)))
+
+                '''# yvar: (I,I_err)'''
+                m = re.search('\# yvar: \(([\w]+),([\w]+)\)', text)
+                comments["yvar"] = (m.group(1),m.group(2))
+
+                '''# values: 6.72365e-17 4.07766e-18 4750'''
+                m = re.search('\# values: ([\d\-\+\.e]+) ([\d\-\+\.e]+) ([\d\-\+\.e]+)', text)
+                comments["vaules"] = (float(m.group(1)), float(m.group(2)),float(m.group(3)))
+                '''# statistics: X0=5.99569; dX=0.0266368;'''
+                m = re.search('\# statistics: X0=([\d\.\-\+e]+); dX=([\d\.\-\+e]+);', text)
+                comments["statistics"] = f'X0={m.group(1)}; dX={m.group(2)}'
+                '''# signal: Min=0; Max=1.20439e-18; Mean=4.10394e-21;'''
+                m = re.search('\# signal: Min=([\ \d\.\+\-e]+); Max=([\ \d\.\+\-e]+); Mean=([\ \d\.\+\-e]+);', text)
+                comments["signal"] = f'Min={m.group(1)}; Max={m.group(2)}; Mean={m.group(3)}'
+            except Exception as e:
+                print(e)
+                sys.exit(f"error while parsing detector {detctor}. Please ensure the format is correct.")
+            if plot:
+                xy=np.swapaxes(readout,0,1)
+                plot.errorbar(xy[0],xy[1],yerr=xy[2])
+                plot.set_xlabel(comments["xlabel"])
+                plot.set_ylabel(comments["ylabel"])
+                plot.set_title(comments["title"])
+            return np.swapaxes(readout, 0, 1), comments

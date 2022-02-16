@@ -1,21 +1,19 @@
 # McStas Python Wrapper (mcpw)
 
-On Windows: If you are using the conda powershell delivert with the mcstas installation use this command to install:
+If you are on windows, using the conda powershell deliverd with the mcstas installation use this command to install:
 
 	pyhton -m pip install mcpw
 
-this will ensure that it will end in the virtual environment ov the conda shell
+this will ensure that it will end in the virtual environment ov the conda shell.
+else:
+
+	pip install mcpw
 
 ## Update Notifications
 
-### 0.2.2->0.3.0:
-renamed function: post_mcrun_funktions() to post_simulation()
-introduced mandatory function pre_simulation()
+### 0.5.4
+added mcpw.mcstas_wrapper.return_detector
 
-Added special function custom():
-
-### 0.4.0:
-mcplot now fully supports all forms of scans 
 
 ### 0.5.0:
 mcvariables and variables are no longer classes but dicts.
@@ -26,6 +24,15 @@ Also mcvar.dn is now mcvar['sim']
 this should clarify the meaning of this variable as it is the name of a simulation run
 
 mcpw.mcstas_wrapper.is_scan renamed to mcpw.mcstas_wrapper.scan_name
+
+### 0.4.0:
+mcplot now fully supports all forms of scans 
+
+### 0.2.2->0.3.0:
+renamed function: post_mcrun_funktions() to post_simulation()
+introduced mandatory function pre_simulation()
+
+Added special function custom()
 
 ## Requirements
 
@@ -223,23 +230,58 @@ This function takes the place of the run_instrument() function as well as all sa
 ## List of usefull functions
 ### General functions
 
+#### psave
+pickle binary dump:
+
 	mcpw.mcstas_wrapper.psave(obj, file_path)
-pickle binary dump
 
-	mcpw.mcstas_wrapper.pload(file_path)
-pickle binary load (returns a object)
+#### pload
+pickle binary load (returns a object):
 
-	mcpw.mcstas_wrapper.scan_name(mcvar)
+	obj = mcpw.mcstas_wrapper.pload(file_path)
+
+#### scan_name
 function to determen if a set of mcvariables triggers a Scan
 returns the name of the variable to scan or 'False'
 
-	mcpw.mcstas_wrapper.scan(mcvar)
+	'str' = mcpw.mcstas_wrapper.scan_name(mcvar)
+
+#### scan
 returns the scan object if one was set in the mcvariable dict otherwise 'None'
-	
 
-	mcpw.mcstas_wrapper.mcpot(var,mcvar[, mode='qt'])
+	obj = mcpw.mcstas_wrapper.scan(mcvar)
+
+#### mcplot
 the original mcplot function
+	
+	mcpw.mcstas_wrapper.mcpot(var,mcvar[, mode='qt'])
 
+#### return_detector
+custom function to get detector output and optionaly plot them directly by handying over a matplotlib axis:
+
+	array, dict = mcpw.mcstas_wrapper.return_detector(var,mcvar, detector = "name"[, N=-1, plot=axis])
+
+dict contains more information about the detector
+
+#### 1D detector:
+array shape:	x	  = array[0]
+				y	  = array[1]
+				y_err = array[2]
+				N	  = array[3]
+
+dict contains:
+title, xlabel, ylabel, zlabel, xvar, yvar, zvar, xylimits, values, statistics, signal
+#### 2D detector:
+array shape:	I	  = array[0] (2D array)
+				I_err = array[1] (2D array)
+				N	  = array[2] (2D array)
+
+dict contains:
+title, xlabel, ylabel, xvar, yvar, xlimits, values, statistics, signal
+#### ploting
+By handing over a matplotlib.axes.Axes opject, the detector image will be plotted on this axis.
+For 1D axes.errorbar() and 2D axes.imshow() will be used.
+xlabel, ylable, title and in case of 2D, the xy scale, will be set accordingly to the additional information provided in the detector file.
 
 ###Functions explicit for jupyter notebook:
 Function returning mcvariables from simmulation:
