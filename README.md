@@ -263,22 +263,22 @@ custom function to get detector output and optionaly plot them directly by handy
 
 dict contains more information about the detector
 
-#### 1D detector:
-array shape:	x	  = array[0]
-				y	  = array[1]
-				y_err = array[2]
-				N	  = array[3]
+##### 1D detector:
+array shape:	x	  = array[0]  
+				y	  = array[1]  
+				y_err = array[2]  
+				N	  = array[3]  
 
 dict contains:
 title, xlabel, ylabel, zlabel, xvar, yvar, zvar, xylimits, values, statistics, signal
-#### 2D detector:
-array shape:	I	  = array[0] (2D array)
-				I_err = array[1] (2D array)
-				N	  = array[2] (2D array)
+##### 2D detector:
+array shape:	I	  = array[0] (2D array)  
+				I_err = array[1] (2D array)  
+				N	  = array[2] (2D array)  
 
 dict contains:
 title, xlabel, ylabel, xvar, yvar, xlimits, values, statistics, signal
-#### ploting
+##### ploting
 By handing over a matplotlib.axes.Axes opject, the detector image will be plotted on this axis.
 For 1D axes.errorbar() and 2D axes.imshow() will be used.
 xlabel, ylable, title and in case of 2D, the xy scale, will be set accordingly to the additional information provided in the detector file.
