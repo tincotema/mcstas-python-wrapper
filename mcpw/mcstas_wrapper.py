@@ -179,7 +179,10 @@ def run_compiler(var,mcvar, cflags=""):
 
 # (mpirun -np 2) instr.out -n -d var=value
 def run_instrument(var,mcvar,var_list):
-    sys.path.append(f"{os.path.dirname(var['mcstas'])}/../tools/Python/mcrun")
+    if os.name == "nt:
+        sys.path.append(f"{os.path.dirname(var['mcstas'])}/../lib/tools/Python/mcrun")
+    else:
+        sys.path.append(f"{os.path.dirname(var['mcstas'])}/../tools/Python/mcrun")
     from mccode import McStasResult
     errormsg = "The Simmulation Failed"
     successmsg = "The simmulation compleated successfully"
@@ -474,7 +477,7 @@ def return_detector(var,mcvar, detector, N=-1, plot=None):
         path = var['sim_res']/mcvar['sim']/detector
         if not isfile(path):
             sys.exit(f'error: File "{path}" dose not exist or is no file.')
-    readout =  np.squeeze(np.loadtxt(var['sim_res']/mcvar['sim']/detector))
+    readout =  np.squeeze(np.loadtxt(path))
     with open(path) as det_file:
         text = det_file.read()
         if "array_2d" in text:
