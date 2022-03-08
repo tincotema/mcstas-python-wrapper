@@ -179,7 +179,7 @@ def run_compiler(var,mcvar, cflags=""):
 
 # (mpirun -np 2) instr.out -n -d var=value
 def run_instrument(var,mcvar,var_list):
-    if os.name == "nt:
+    if os.name == "nt":
         sys.path.append(f"{os.path.dirname(var['mcstas'])}/../lib/tools/Python/mcrun")
     else:
         sys.path.append(f"{os.path.dirname(var['mcstas'])}/../tools/Python/mcrun")
