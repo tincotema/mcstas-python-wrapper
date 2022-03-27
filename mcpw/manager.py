@@ -27,6 +27,10 @@ def main():
              description="Use 'manager mode --help' to view the help for any command.",
              metavar='mode')
 
+    parser.add_argument('-V', '--verbose', dest='verbose', default=False, action='store_true',
+                       help='expanded output, contains stdout and stderr of all executed programs.')
+    parser.add_argument('-R', '--recompile', dest='recompile', default=False, action='store_true',
+                       help='will force a recopile of the instrument regardless if changes were made.')
     parser.add_argument('-p', '--python_file', dest='python_file', default='', type=str, required=True,
                        help='path (absolute or not) to the python file containing mcvariables and analyse functions')
 
@@ -103,6 +107,10 @@ def main():
             sys.exit(f"could not import {args.list}. an exception occurred:\n{e}")
 
     msg  = ''
+    #adding runtime variables to var
+    var["recompile"]=args.recompile
+    var["verbose"]=args.verbose
+
     #calling the correct function according to command arguments
     if 'func' not in args:
         # Fallback to --help.

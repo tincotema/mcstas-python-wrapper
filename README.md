@@ -1,5 +1,24 @@
 # McStas Python Wrapper (mcpw)
 
+## Why jet an other python wrapper?
+
+You may ask your self, hey isn't there already [McStasScript](https://pypi.org/project/McStasScript/)?
+Yes there is. I began writing this before i knew that McStasScript exists and now this package contains features MCstasScript dosnt have.
+My task at and was to create a mcstas instrument capable of running as an virtual instrument behind our control software Nicos.
+So the mcstas instrument has to be controled by (mostly) similar variables as the components at the real experiment, including pre-calculated values.
+Also, the post processing needed several variables of the simulation to work properly. with a single framework providing the variables to both the simulation and the post processing,
+user errors can be eliminated and automatisation made easier.
+Furthermore our custom monitor needs extensive postprocessing to retreve our actual signal, for witch we allready had working scripts.
+So the necessity for the pre_simulation and post_simulation as well analyse functions, var_lists, etc.
+With this, you are able to compile your instrument, precalculate your variables or read them from a csv file, run your simulation(s), maybe postprocess the output to save space
+and analyse your results directly or at a later date with one command.
+
+If you have more ideas for usefull features, feel free to make a feature-issue on github or mergerequest of your own feature.
+
+## Installation
+
+Make shure you have a working installation of Mcstas for help see this [installation instruction](https://github.com/McStasMcXtrace/McCode/tree/master/INSTALL-McStas).
+
 If you are on windows, using the conda powershell deliverd with the mcstas installation use this command to install:
 
 	pyhton -m pip install mcpw
@@ -11,6 +30,11 @@ else:
 
 ## Update Notifications
 
+### 0.5.8
+
+A recompile now only happens if components, .h-files or the instrument in the working directory /
+ additionally specified component directories have changed.
+
 ### 0.5.4
 added mcpw.mcstas_wrapper.return_detector
 
@@ -21,9 +45,10 @@ This was done due to compatibility problems between simmuations done from comman
 and jupyter notebook
 
 Also mcvar.dn is now mcvar['sim']
-this should clarify the meaning of this variable as it is the name of a simulation run
+this should clarify the meaning of this variable as it is the name of a simulation run.
+In jupyter notebooks you have to change your simulate function parameter dn="" to sim="".
 
-mcpw.mcstas_wrapper.is_scan renamed to mcpw.mcstas_wrapper.scan_name
+mcpw.mcstas_wrapper.is_scan renamed to mcpw.mcstas_wrapper.scan_name.
 
 ### 0.4.0:
 mcplot now fully supports all forms of scans 
@@ -270,14 +295,14 @@ array shape:	x	  = array[0]
 				N	  = array[3]  
 
 dict contains:
-title, xlabel, ylabel, zlabel, xvar, yvar, zvar, xylimits, values, statistics, signal
+title, xlabel, ylabel, xvar, yvar, xlimits, values, statistics, signal
 ##### 2D detector:
 array shape:	I	  = array[0] (2D array)  
 				I_err = array[1] (2D array)  
 				N	  = array[2] (2D array)  
 
 dict contains:
-title, xlabel, ylabel, xvar, yvar, xlimits, values, statistics, signal
+title, xlabel, ylabel, zlabel, xvar, yvar, zvar, xylimits, values, statistics, signal
 ##### ploting
 By handing over a matplotlib.axes.Axes opject, the detector image will be plotted on this axis.
 For 1D axes.errorbar() and 2D axes.imshow() will be used.
@@ -298,6 +323,8 @@ Function returning mcvariables from simmulation:
 	
 	optional arguments:
 	  -h, --help            show this help message and exit
+	  -V, --verbose         expanded output, contains stdout and stderr of all executed programs.
+	  -R, --recompile       will force a recopile of the instrument regardless if changes were made.
 	  -p PYTHON_FILE, --python_file PYTHON_FILE
 	                        path (absolute or not) to the python file containing mcvariables and analyse functions
 	  -d RESULT_DIR, --result-dir RESULT_DIR

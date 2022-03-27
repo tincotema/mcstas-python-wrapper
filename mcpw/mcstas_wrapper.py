@@ -32,18 +32,21 @@ def scan(mcvar):
     print("no object of Class Scan found")
     return None
 
-def execute(command, errormsg, successmsg, print_command=True):
+def execute(command, errormsg, successmsg, print_command=True, verbose=False):
     if print_command:
         print(f"runing: {command}")
     run_return = sp.run(command, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE)
     # check if the process was successfully
     if run_return.returncode != 0:
-        print(run_return.returncode)
-        print(run_return.stdout)
-        print(run_return.stderr)
+        print(f"\nreturn code:{run_return.returncode}")
+        print(f"stdout:\n{run_return.stdout}")
+        print(f"stderr:\n{run_return.stderr}\n")
         sys.exit(errormsg)
     else:
-        #print(run_return.stdout)
+        if verbose:
+            print(f"\nreturn code:{run_return.returncode}")
+            print(f"stdout:\n{run_return.stdout}")
+            print(f"stderr:\n{run_return.stderr}\n")
         print(f"{successmsg}\n")
     return run_return
 
@@ -96,6 +99,20 @@ def valid_mcconfig(var,mcvar):
                 sys.exit(f"\nmpicc is not installed. please install openmpi")
 
 
+def max_age_of_file_or_dir_list(file_or_dir_list):
+    ages = []
+    for entry in file_or_dir_list:
+        if entry != '':
+            if isdir(entry):
+                with os.scandir(entry) as it:
+                    for e in it:
+                        if e.name.endswith(('.comp','.instr','.h')) and e.is_file():
+                            ages.append(os.stat(e).st_mtime)
+            else:
+                if entry.is_file():
+                    ages.append(os.stat(entry).st_mtime)
+    return max(ages)
+
 def encode_files_to_local_encoding(file_or_dir_list, output_dir):
     file_list = []
     for entry in file_or_dir_list:
@@ -126,6 +143,14 @@ def run_mcstas(var, mcvar):
     # create output name
     instr_c_file = mcvar['instr_file'].split('.')[0] + ".c"
     temp_dir = 'temp_encoding'
+    #age of current c_file
+    if isfile(var['p_local']/instr_c_file):
+        c_file_age = os.stat(var['p_local']/instr_c_file).st_mtime
+    else:
+        c_file_age = -1
+    source_age = max_age_of_file_or_dir_list([var['p_local']/mcvar['instr_file'], var['p_local'], var['componentdir'], var['p_local']/'local_var.py'])
+    if not (source_age > c_file_age or var['recompile'] or c_file_age < 0) :
+        return
     if os.name=='nt':
         os.environ['MCSTAS'] = dirname(var['mcstas'])+'/../lib/'
         if not isdir(var['p_local']/temp_dir):
@@ -152,10 +177,15 @@ def run_mcstas(var, mcvar):
         run_return = sp.run(run_string, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE)
     # check if the process was successfull
     if run_return.returncode != 0:
+        print(f"\nreturn code:{run_return.returncode}\n")
         print(run_return.stdout)
         print(run_return.stderr)
         sys.exit("An error occurred while running McStas Compiler")
     else:
+        if var["verbose"]:
+            print(f"\nreturn code:{run_return.returncode}\n")
+            print(run_return.stdout)
+            print(run_return.stderr)
         print(f"McStas compiler done\n")
 
 # gcc (mpicc) -o p_local/reseda.out p_local/reseda.c -lm (-DUSE_MPI) -g -O2 -lm -std=c99
@@ -165,6 +195,12 @@ def run_compiler(var,mcvar, cflags=""):
         instr_out_file = mcvar['instr_file'].split('.')[0] + ".exe"
     else:
         instr_out_file = mcvar['instr_file'].split('.')[0] + ".out"
+
+    #check if compiling is necessary
+    c_file_age = os.stat(var['p_local']/instr_c_file).st_mtime
+    instr_out_file_age = os.stat(var['p_local']/instr_out_file).st_mtime
+    if not c_file_age > instr_out_file_age:
+         return
     #check if mpi is enabled
     if var['mpi'] == 0:
         run_string = f"gcc "
@@ -175,7 +211,7 @@ def run_compiler(var,mcvar, cflags=""):
             run_string = f"mpicc -DUSE_MPI "
     run_string = run_string + f"-o {var['p_local']/instr_out_file} {var['p_local']/instr_c_file} -lm -g -O2 -std=c99 {cflags}"
     # exectue the run_string and capture the output
-    execute(run_string, "An error occurred while running the C Compiler", "C compiler done")
+    execute(run_string, "An error occurred while running the C Compiler", "C compiler done", verbose=var["verbose"])
 
 # (mpirun -np 2) instr.out -n -d var=value
 def run_instrument(var,mcvar,var_list):
@@ -233,7 +269,7 @@ def run_instrument(var,mcvar,var_list):
                         params = params + f"{var_name}={var_value} "
             final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {params} "
 
-            out = execute(final_run_string, errormsg, successmsg, print_command=False)
+            out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'])
             temp = sys.stdout
             sys.stdout = DummyFile()
             dets=McStasResult(out.stdout).get_detectors()
@@ -262,7 +298,7 @@ def run_instrument(var,mcvar,var_list):
 
             temp = sys.stdout
             sys.stdout = DummyFile()
-            out = execute(final_run_string, errormsg, successmsg, print_command=False)
+            out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'])
             dets=McStasResult(out.stdout).get_detectors()
             sys.stdout = temp
             for det in dets:
@@ -274,7 +310,7 @@ def run_instrument(var,mcvar,var_list):
         create_dat_file(dets, var, mcvar, var_list, dets_vals)
     else:
         final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim'])} {params} "
-        execute(final_run_string, errormsg, successmsg)
+        execute(final_run_string, errormsg, successmsg, verbose=var['verbose'])
         res_list.append(var['sim_res']/mcvar['sim'])
     return res_list
 
