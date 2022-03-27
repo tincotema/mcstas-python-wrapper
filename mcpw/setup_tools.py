@@ -18,31 +18,31 @@ class variables():
 '''
 def create_local_var_dict(args):
     print("generating class variables")
-    class_variables_lines = []
-    class_variables_lines.append("from pathlib import Path             #needed for the path logic")
-    class_variables_lines.append("variables = {")
-    class_variables_lines.append("    #directorys")
-    class_variables_lines.append(f'    "p_server"     : Path("/"),')
-    class_variables_lines.append(f'    "p_local"      : Path("{args.working_dir}"),')
-    class_variables_lines.append(f'    "sim_res"      : "{args.output_dir}",')
-    class_variables_lines.append(f"    #ssh related variables")
-    class_variables_lines.append(f'    "rate"         : 32000, #scp transfairrate in bits/s')
-    class_variables_lines.append(f'    "port"         : 22,')
-    class_variables_lines.append(f'    "server"       : "",')
-    class_variables_lines.append(f"    #mcstas location")
-    class_variables_lines.append(f'    "mcstas"       : "{args.mcstas}",')
-    class_variables_lines.append(f'    "componentdir" : "{args.component_dir}",')
-    class_variables_lines.append(f"    #mcstas variables")
-    class_variables_lines.append(f'    "mpi"          : {args.mpi},')
-    class_variables_lines.append(f"    #additional c compiler flags,")
-    class_variables_lines.append(f'    "cflags"       : ""')
-    class_variables_lines.append('    }')
+    local_var_dict_lines = []
+    local_var_dict_lines.append("from pathlib import Path             #needed for the path logic")
+    local_var_dict_lines.append("variables = {")
+    local_var_dict_lines.append("    #directorys")
+    local_var_dict_lines.append(f'    "p_server"     : Path("/"),')
+    local_var_dict_lines.append(f'    "p_local"      : Path("{args.working_dir}"),')
+    local_var_dict_lines.append(f'    "sim_res"      : "{args.output_dir}",')
+    local_var_dict_lines.append(f"    #ssh related variables")
+    local_var_dict_lines.append(f'    "rate"         : 32000, #scp transfairrate in bits/s')
+    local_var_dict_lines.append(f'    "port"         : 22,')
+    local_var_dict_lines.append(f'    "server"       : "",')
+    local_var_dict_lines.append(f"    #mcstas location")
+    local_var_dict_lines.append(f'    "mcstas"       : "{args.mcstas}",')
+    local_var_dict_lines.append(f'    "componentdir" : "{args.component_dir}",')
+    local_var_dict_lines.append(f"    #mcstas variables")
+    local_var_dict_lines.append(f'    "mpi"          : {args.mpi},')
+    local_var_dict_lines.append(f"    #additional c compiler flags,")
+    local_var_dict_lines.append(f'    "cflags"       : ""')
+    local_var_dict_lines.append('    }')
 
-    return class_variables_lines
+    return local_var_dict_lines
 def create_local_var(args):
-    class_variables_lines = create_local_var_dict(args)
+    local_var_dict_lines = create_local_var_dict(args)
     with open(f"{args.working_dir}/local_var.py", "w") as pyfile:
-        for line in class_variables_lines:
+        for line in local_var_dict_lines:
             print(line)
             pyfile.write("{}\n".format(line))
 
@@ -112,7 +112,6 @@ def create_mcvar_dict(instrument):
                         for entry in line.split("(")[1].split(")")[0].split(","):
                             var_lines.append(entry.split('='))
                             var_lines[-1][0]=var_lines[-1][0].strip().split(' ')[-1]
-                            print(var_lines[-1])
                         in_define_section = False
                 if in_define_section:
                     if line == ")\n":
@@ -120,7 +119,6 @@ def create_mcvar_dict(instrument):
                     if (line != "(\n") and not line.startswith("DEFINE INSTRUMENT") and line !="\n" and line !=")\n":
                         var_lines.append(line.replace("\t","    ").replace("\n","").replace(",","").replace(")","").replace("//","#").lstrip().split('='))
                         var_lines[-1][0]=var_lines[-1][0].strip().split(' ')[-1]
-                        print(var_lines[-1])
                     if line.replace("\n","").endswith(")"):
                         in_define_section = False
             except Exception as e:
@@ -128,25 +126,24 @@ def create_mcvar_dict(instrument):
                 print(f"ERROR while parsing instrument variables: \n {line}\n\nPlease make shure the Define section of the instrument looks like this:\nDEFINE INSTRUMENT 'instrument'\n(\n  double x = 1.0,     //comment\n\n  int i = 1,          //comment\n  float f = 1.0,      //comment\n)")
                 exit()
 
-    class_mcvariables_lines = []
-    class_mcvariables_lines.append("mcvariables = { #dict to hold the variables needed to run the mcstas simulation")
-    class_mcvariables_lines.append("    # allways needed")
-    class_mcvariables_lines.append('    "sim"            : "default",')
-    class_mcvariables_lines.append('    "n"              : 1000000,')
-    class_mcvariables_lines.append(f'    "instr_file"     : "{basename(instrument)}",  #the name of the instrument file, must be located in p_server/p_local')
-    class_mcvariables_lines.append('    #__________________________________________________________________________#')
-    class_mcvariables_lines.append('    #variables defined in the DEFINE INSTRUMENT section of the mcstas instrument')
+    mcvar_dict_lines = []
+    mcvar_dict_lines.append("mcvariables = { #dict to hold the variables needed to run the mcstas simulation")
+    mcvar_dict_lines.append("    # allways needed")
+    mcvar_dict_lines.append('    "sim"            : "default",')
+    mcvar_dict_lines.append('    "n"              : 1000000,')
+    mcvar_dict_lines.append(f'    "instr_file"     : "{basename(instrument)}",  #the name of the instrument file, must be located in p_server/p_local')
+    mcvar_dict_lines.append('    #__________________________________________________________________________#')
+    mcvar_dict_lines.append('    #variables defined in the DEFINE INSTRUMENT section of the mcstas instrument')
     for line in var_lines:
         if len(line)==2:
             if line[1].__contains__("#"):
-                print(line)
-                class_mcvariables_lines.append(f'    "{line[0]}" : {line[1].strip().split(" ")[0]}, #{line[1].split("#")[1]}')
+                mcvar_dict_lines.append(f'    "{line[0]}" : {line[1].strip().split(" ")[0]}, #{line[1].split("#")[1]}')
             else:
-                class_mcvariables_lines.append(f'    "{line[0]}" : {line[1].strip().split(" ")[0]},')
+                mcvar_dict_lines.append(f'    "{line[0]}" : {line[1].strip().split(" ")[0]},')
         else:
-            class_mcvariables_lines.append(f"    # {line[0].replace('#', '')}")
-    class_mcvariables_lines.append('    }')
-    return class_mcvariables_lines
+            mcvar_dict_lines.append(f"    # {line[0].replace('#', '')}")
+    mcvar_dict_lines.append('    }')
+    return mcvar_dict_lines
 
 def create_header_lines():
     header_lines = []
@@ -209,15 +206,14 @@ def create_python_file(args):
     header_lines = create_header_lines()
     main_lines = create_main_lines()
     print(f"reading {args.instrument}")
-    #class_mcvariables_lines = create_class_mcvariables_lines(f"{args.working_dir}/{args.instrument}")
-    class_mcvariables_lines = create_mcvar_dict(f"{args.working_dir}/{args.instrument}")
+    mcvar_dict_lines = create_mcvar_dict(f"{args.working_dir}/{args.instrument}")
     with open(f"{args.working_dir}/{args.instrument.split('.')[0]}.py", "w") as pyfile:
         for line in header_lines:
             print(line)
             pyfile.write("{}\n".format(line))
         pyfile.write("\n")
         pyfile.write("\n")
-        for line in class_mcvariables_lines:
+        for line in mcvar_dict_lines:
             print(line)
             pyfile.write("{}\n".format(line))
         pyfile.write("\n")
