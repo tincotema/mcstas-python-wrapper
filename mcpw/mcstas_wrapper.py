@@ -150,6 +150,7 @@ def run_mcstas(var, mcvar):
         c_file_age = -1
     source_age = max_age_of_file_or_dir_list([var['p_local']/mcvar['instr_file'], var['p_local'], var['componentdir'], var['p_local']/'local_var.py'])
     if not (source_age > c_file_age or var['recompile'] or c_file_age < 0) :
+        print("Sciping McStas-Compiler")
         return
     if os.name=='nt':
         os.environ['MCSTAS'] = dirname(var['mcstas'])+'/../lib/'
@@ -198,9 +199,13 @@ def run_compiler(var,mcvar, cflags=""):
 
     #check if compiling is necessary
     c_file_age = os.stat(var['p_local']/instr_c_file).st_mtime
-    instr_out_file_age = os.stat(var['p_local']/instr_out_file).st_mtime
-    if not c_file_age > instr_out_file_age:
-         return
+    if isfile(var['p_local']/instr_out_file):
+        instr_out_file_age = os.stat(var['p_local']/instr_out_file).st_mtime
+    else:
+        instr_out_file_age = -1
+    if not (c_file_age > instr_out_file_age or instr_out_file_age < 0):
+        print("Sciping C-Compiler")
+        return
     #check if mpi is enabled
     if var['mpi'] == 0:
         run_string = f"gcc "
