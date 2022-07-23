@@ -102,25 +102,28 @@ def create_mcvar_dict(instrument):
         befor_define_section = True
         in_define_section = False
         for line in mcfile:
+
             try:
-                line = line.replace("\t", "    ").lstrip()
+                line = line.replace("\t", "    ").lstrip()    # removing any leading whitespaces
                 if befor_define_section:
-                    if line.startswith("DEFINE INSTRUMENT"):
+                    if line.startswith("DEFINE INSTRUMENT"):  # find define section
                         befor_define_section = False
                         in_define_section = True
-                    if line.endswith(")\n"):
+                    if line.endswith(")\n"):                  # case if define is one liner
                         for entry in line.split("(")[1].split(")")[0].split(","):
                             var_lines.append(entry.split('='))
                             var_lines[-1][0]=var_lines[-1][0].strip().split(' ')[-1]
                         in_define_section = False
-                if in_define_section:
-                    if line == ")\n":
+                if in_define_section:                         #case if define is multiple lines
+                    if line == ")\n":                         #looking for end of define section
                         in_define_section = False
-                    if (line != "(\n") and not line.startswith("DEFINE INSTRUMENT") and line !="\n" and line !=")\n":
+                    elif (line != "(\n") and not line.startswith("DEFINE INSTRUMENT") and line !="\n":   # line with actual content
                         var_lines.append(line.replace("\t","    ").replace("\n","").replace(",","").replace(")","").replace("//","#").lstrip().split('='))
-                        var_lines[-1][0]=var_lines[-1][0].strip().split(' ')[-1]
-                    if line.replace("\n","").endswith(")"):
-                        in_define_section = False
+                        if len(var_lines[-1]) == 2:                                    # differentiating between comments only lines and variables
+                            var_lines[-1][0]=var_lines[-1][0].strip().split(' ')[-1]
+                        print(var_lines[-1])
+                        if line.replace("\n","").endswith(")"):   #looking for end of define section
+                            in_define_section = False
             except Exception as e:
                 print(e)
                 print(f"ERROR while parsing instrument variables: \n {line}\n\nPlease make shure the Define section of the instrument looks like this:\nDEFINE INSTRUMENT 'instrument'\n(\n  double x = 1.0,     //comment\n\n  int i = 1,          //comment\n  float f = 1.0,      //comment\n)")
@@ -132,8 +135,8 @@ def create_mcvar_dict(instrument):
     mcvar_dict_lines.append('    "sim"            : "default",')
     mcvar_dict_lines.append('    "n"              : 1000000,')
     mcvar_dict_lines.append(f'    "instr_file"     : "{basename(instrument)}",  #the name of the instrument file, must be located in p_server/p_local')
-    mcvar_dict_lines.append('    #__________________________________________________________________________#')
-    mcvar_dict_lines.append('    #variables defined in the DEFINE INSTRUMENT section of the mcstas instrument')
+    mcvar_dict_lines.append('    #____________________________________________________________________________#')
+    mcvar_dict_lines.append('    # variables defined in the DEFINE INSTRUMENT section of the mcstas instrument')
     for line in var_lines:
         if len(line)==2:
             if line[1].__contains__("#"):
@@ -141,7 +144,8 @@ def create_mcvar_dict(instrument):
             else:
                 mcvar_dict_lines.append(f'    "{line[0]}" : {line[1].strip().split(" ")[0]},')
         else:
-            mcvar_dict_lines.append(f"    # {line[0].replace('#', '')}")
+            mcvar_dict_lines.append(f"    # {line[0].replace('#', '').lstrip()}")
+    mcvar_dict_lines.append('    # end of mcstas variables')
     mcvar_dict_lines.append('    }')
     return mcvar_dict_lines
 
@@ -150,18 +154,18 @@ def create_header_lines():
     header_lines.append(f'# import section')
     header_lines.append(f'from mcpw.mcstas_wrapper import Scan, scan_name, scan, mcplot')
     header_lines.append(f'')
-    header_lines.append(f'#this file must allways contain:')
-    header_lines.append(f'#mcvariables: a dict containing all parameters for the mcstas instrument file')
-    header_lines.append(f'#def pre_simulation(var,mcvar) a funcition containing all functions that should be exectuded directly before esecuting the instrument. for example to play with variables. dose not influence the compilers')
-    header_lines.append(f'#def post_simulation(var,mcvar) a funcition containing all functions that should be exectuded directly after the simulation has been finished. for example to post process the simulation results permanently')
-    header_lines.append(f'#def analyse(var,mcvar) a funcition containing all functions that should be exectuded to analyse a finished mcstas simulation')
+    header_lines.append(f'# this file must allways contain:')
+    header_lines.append(f'# mcvariables: a dict containing all parameters for the mcstas instrument file')
+    header_lines.append(f'# def pre_simulation(var,mcvar) a funcition containing all functions that should be exectuded directly before esecuting the instrument. for example to play with variables. dose not influence the compilers')
+    header_lines.append(f'# def post_simulation(var,mcvar) a funcition containing all functions that should be exectuded directly after the simulation has been finished. for example to post process the simulation results permanently')
+    header_lines.append(f'# def analyse(var,mcvar) a funcition containing all functions that should be exectuded to analyse a finished mcstas simulation')
     return header_lines
 
 def create_main_lines():
     main_lines = []
-    main_lines.append(f'###########################')
-    main_lines.append(f'#   your custom function  #')
-    main_lines.append(f'###########################')
+    main_lines.append(f'########################')
+    main_lines.append(f'# your custom function #')
+    main_lines.append(f'########################')
     main_lines.append(f'')
     main_lines.append(f'def custom_function1(var,mcvar,var_list):')
     main_lines.append(f'    print("pre simulation section")')
