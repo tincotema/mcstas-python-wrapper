@@ -108,8 +108,8 @@ def main():
 
     msg  = ''
     #adding runtime variables to var
-    var["recompile"]=args.recompile
-    var["verbose"]=args.verbose
+    var['recompile']=args.recompile
+    var['verbose']=args.verbose
 
     #calling the correct function according to command arguments
     if 'func' not in args:

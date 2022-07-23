@@ -4,6 +4,7 @@ import subprocess as sp              #needed to run mcstas
 import argparse
 import os
 import re
+from pathlib import Path
 from os.path import isdir, isfile, isabs, islink
 from mcpw.setup_tools import create_local_var, create_mcvar_dict
 from mcpw.mcstas_wrapper import run_mcstas, run_compiler,\
@@ -26,8 +27,11 @@ def load_var_list(var,mcvar):
     except:
         return []
 
-def simulate(var, mcvar, var_list=[], var_list_csv='', sim='', remote=False): #spawns a simulation if sim dose not jet exists and returns a list of result dirs
+def simulate(var, mcvar, var_list=[], var_list_csv='', sim='', remote=False, recompile=False, verbose=False): #spawns a simulation if sim dose not jet exists and returns a list of result dirs
     msg = ''
+    #adding runtime variables to var
+    var['recompile']=recompile
+    var['verbose']=verbose
     #checking for imput
     if not sim:
         print('no result folder name given.\n please enter one as 4th argument to this function.')
@@ -96,8 +100,28 @@ def print_mcvariable_from_instrument(instrument):
         print(line)
 
 # fuction to create local_var.py and load it
-def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_dir='simulation_results', component_dir='', mpi=0):
+def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_dir='simulation_results', component_dir='', mpi=0, ssh_server='', ssh_port=22, ssh_rate=0, ssh_path=".", cflags=""):
     # substituting \ for / to avoid complications with the paths
+
+
+    '''
+    variables = {
+            #directorys
+            p_server    : Path("/path/to/working/dir"),
+            p_local     : Path("/path/to/working/dir"),
+            sim_res     : "simulation_results/",
+            #ssh related variables
+            rate        : 32000, #scp transfairrate in bits/s
+            port        : 22,
+            server      : ""
+            #mcstas location
+            mcstas  : "mcstas",
+            componentdir
+            #mcstas variables
+            mpi         : 2,
+            #additional c compiler flags
+            cflags      : "",
+    '''
     if os.name == 'nt':
         working_dir   = re.sub(r'\\','/', working_dir)
         mcstas        = re.sub(r'\\','/', mcstas)
@@ -153,20 +177,36 @@ def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_d
             which("mpicc")
 
     # parsing arguments
-    args= argparse.Namespace(working_dir=working_dir,\
-                            mcstas=mcstas,\
-                            instrument=instrument,\
-                            output_dir=output_dir,\
-                            component_dir=component_dir,\
-                            mpi = mpi)
+    #args= argparse.Namespace(working_dir=working_dir,\
+    #                        mcstas=mcstas,\
+    #                        instrument=instrument,\
+    #                        output_dir=output_dir,\
+    #                        component_dir=component_dir,\
+    #                        mpi = mpi)
 
     # creating local_var.py file if not exiisting
     #TODO: check if imput correspont to existing local_var.py and give user feedback
-    if not os.path.isfile(f"{working_dir}/local_var.py"):
-        create_local_var(args)
-    # importing local variables
-    sys.path.append(working_dir)
-    from local_var import variables as var
+
+
+
+
+    #if not os.path.isfile(f"{working_dir}/local_var.py"):
+    #    create_local_var(args)
+    ## importing local variables
+    #sys.path.append(working_dir)
+    #from local_var import variables as var
+    var = {
+        "p_server" : Path(ssh_path),
+        "p_local" : Path(working_dir),
+        "sim_res" : output_dir,
+        "ssh_rate" : ssh_rate,
+        "ssh_port" : ssh_port,
+        "ssh_server" : ssh_server,
+        "mcstas" : mcstas,
+        "componentdir" : component_dir,
+        "mpi" : mpi,
+        "cflags" : cflags,
+    }
     valid_config(var)
     print("usefull variables: var['sim_res'] directory where simulation_results are saved.\n\
                         in combination with mcvar['sim'] you get the full path to your detector files:\n\

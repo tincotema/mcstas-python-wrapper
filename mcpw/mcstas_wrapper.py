@@ -106,10 +106,10 @@ def max_age_of_file_or_dir_list(file_or_dir_list):
             if isdir(entry):
                 with os.scandir(entry) as it:
                     for e in it:
-                        if e.name.endswith(('.comp','.instr','.h')) and e.is_file():
+                        if e.name.endswith(('.comp','.instr','.h')) and isfile(e):
                             ages.append(os.stat(e).st_mtime)
             else:
-                if entry.is_file():
+                if isfile(entry):
                     ages.append(os.stat(entry).st_mtime)
     return max(ages)
 
