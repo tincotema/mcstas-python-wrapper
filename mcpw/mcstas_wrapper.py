@@ -258,13 +258,15 @@ def run_instrument(var,mcvar,var_list):
         #creating main result directory
         os.mkdir(var['sim_res']/mcvar['sim'])
         for name in var_list[0]:
-            no_use_vars.append(name)
+            if not name.startswith('#'):
+                no_use_vars.append(name)
         for i in range(len(var_list)-1):
             value_list=[]
             print(f"step:{i+1}/{len(var_list)-1}")
             for j, name in enumerate(var_list[0]):
-                params = params + f"{name}={var_list[i+1][j]} "
-                value_list.append(str(var_list[i+1][j]))
+                if not name.startswith('#'):
+                    params = params + f"{name}={var_list[i+1][j]} "
+                    value_list.append(str(var_list[i+1][j]))
             for var_name, var_value in mcvar.items():
             #for var_name, var_value in mcvar.__dict__.items():
                 if not (var_name in no_use_vars):
@@ -416,11 +418,12 @@ def mcplot(var,mcvar,msg='', mode='qt'):
 def create_sim_file(dets, var, mcvar,var_list):
     if var_list:
         steps = len(var_list)-1
-        scan_names = ", ".join(var_list[0])
+        scan_names = ", ".join(filter(lambda x: x.startswith('#'),var_list[0]))
         params = ""
         for i in range(len(var_list[0])):
+            if not var_list[0][i].startswith("#"):
             #print(f' {var_list[0][i]} = {var_list[1][i]}, {var_list[0][i]} = {var_list[-1][i]},')
-            params+=f' {var_list[0][i]} = {var_list[1][i]}, {var_list[0][i]} = {var_list[-1][i]},'
+                params+=f' {var_list[0][i]} = {var_list[1][i]}, {var_list[0][i]} = {var_list[-1][i]},'
         params = params[:-1] # removing last comma
         xlimits = f' {var_list[1][0]} {var_list[-1][0]}'
     else:
@@ -470,10 +473,11 @@ def create_sim_file(dets, var, mcvar,var_list):
 def create_dat_file(dets, var, mcvar, var_list, dets_vals):
     if var_list:
         steps = len(var_list)-1
-        scan_names = ", ".join(var_list[0])
+        scan_names = ", ".join(filter(lambda x: x.startswith('#'),var_list[0]))
         params = ""
         for i in range(len(var_list[0])):
-            params+=f' {var_list[0][i]} = {var_list[1][i]},'
+            if not var_list[0][i].startswith("#"):
+                params+=f' {var_list[0][i]} = {var_list[1][i]},'
         params = params[:-1] # removing last comma
         xlimits = f' {var_list[1][0]} {var_list[-1][0]}'
     else:

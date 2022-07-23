@@ -120,7 +120,7 @@ def main():
         valid_mcconfig(var,mcvar)
         if args.func == 'analyse':
             try:
-                var_list = load_var_list(var['sim_res']/mcvar["sim"]/'var_list')
+                var_list = load_var_list(var['sim_res']/mcvar["sim"]/'var_list.csv')
             except: var_list = []
             mcvar = pload(var['sim_res']/mcvar["sim"]/'variables') #loading the correct variables
             valid_mcconfig(var,mcvar)
@@ -133,7 +133,7 @@ def main():
             var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
             run_instrument(var,mcvar, var_list)
             check_for_detector_output(var,mcvar,var_list)
-            save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list')  #save mcstas variables
+            save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list.csv')  #save mcstas variables
             psave(mcvar, var['sim_res']/mcvar["sim"]/'variables')  #save mcstas variables
             post_simulation(var, mcvar, var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
             sp.run(['tar', '-cf' '{}/{}.tar'.format(var['sim_res'], mcvar["sim"]), var['sim_res']/mcvar["sim"]]) #compress data
@@ -152,7 +152,7 @@ def main():
             var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
             run_instrument(var,mcvar,var_list)
             check_for_detector_output(var,mcvar,var_list)
-            save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list')  #save mcstas variables
+            save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list.csv')  #save mcstas variables
             psave(mcvar, var['sim_res']/mcvar["sim"]/'variables')  #save mcstas variables
             post_simulation(var, mcvar,var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
 
@@ -162,7 +162,7 @@ def main():
             var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
             run_instrument(var,mcvar,var_list)
             check_for_detector_output(var,mcvar,var_list)
-            save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list')  #save mcstas variables
+            save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list.csv')  #save mcstas variables
             psave(mcvar, var['sim_res']/mcvar["sim"]/'variables')  #save mcstas variables
             post_simulation(var, mcvar, var_list) # contains functions that get executed after mcstas finished and can i.e. reformate the output
             analyse(var, mcvar,var_list)                                               #call analyse, defined in reseda.py
