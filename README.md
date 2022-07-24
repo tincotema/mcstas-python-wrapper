@@ -30,12 +30,23 @@ else:
 
 ## Update Notifications
 
-### 0.5.8
+### 0.6.0:
+
+"var_list" file renamed to "var_list.csv". This needs to be updated manually in older simulation_results foulders
+in the var_list columns can no be ignored by adding a '#' infront of the variable name.
+
+Jupyter no longer needs a "local_var.py" file. 
+Known Issue: if a compile flage is changed, this dose not trigger a recompile as in the command line version.
+This can be mitigated using the recompile flag in the simulate function
+
+
+
+### 0.5.8:
 
 A recompile now only happens if components, .h-files or the instrument in the working directory /
  additionally specified component directories have changed.
 
-### 0.5.4
+### 0.5.4:
 added mcpw.mcstas_wrapper.return_detector
 
 
@@ -84,7 +95,7 @@ MPIexec will not work and leads to an error.
 This Package offers several functions to improve your workflow with Mcstas Simuations and
 Processing the simmulation results.
 
-The Functionality is build around the two Classes variables and mcvariables.
+The Functionality is build around the two Dictionarys variables and mcvariables.
 
 ### Dict variables
 Parameters of the dict variables are global variables that apply to any simulation and contains the location of the main working directory.
@@ -186,6 +197,8 @@ For more advanced usecases have a look at mcpw_manager --help .
 The Scan class is used to simplify the process of runing a number of simulations over a range of one variable.
 If you want to change more than one variable per step, use the csv file function. 
 
+	Scan(start,stop,unit,step)
+
 The first two arguments are the start and stop range for the Scan, the 3th value is a string which represents the unit of the scan variable. the 4th value is the number of steps.
 The scan points are evenly distributed between the start and stop points, which are included.
 
@@ -216,6 +229,8 @@ Mini example csv:
 
 The content of the csv is loaded into the variable var_list.
 
+If you want to ignore a colum you can do this by adding a '#' at the beginning of the variable name. i.e: x, #y, z; in this case the y colum would be ignored.
+
 If you want to load a csv with a different format than described above, you have to reformat it accordingly inside the scope of the pre_simulation function.
 
 ## Jupyter Notebook Usage
@@ -235,7 +250,7 @@ You will get a printout for your mcvariable class. copy the section into the nex
 
 Now var and mcvar should be initialized and you can run a simmulation with:
 
-	mcvar, res = simulate(var, mcvar, sim='bla'[,var_list=[], var_list_csv=PATH])
+	mcvar, res = simulate(var, mcvar, sim='bla'[,var_list=[], var_list_csv=PATH, recompile=False, verbose=False])
 
 This function returns the used mcvariables and a list of result directorys where the simulation results are saved.
 If the command is called a second time with the same value for dn, the mcvariables and result directorys for this dn will be loaded end returned.

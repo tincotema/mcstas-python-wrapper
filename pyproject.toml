@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcpw"
+version = "0.6.0"
+authors = [{name="Tincotema",email="tincotema@genthree.io"}]
+maintainers = [{name="Tincotema",email="tincotema@genthree.io"}]
+description = "A lightweight and versitile McStas Python Wrapper for console and jupyter notebook"
+readme = "README.md"
+license = {text="MIT"}
+classifiers=[
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Environment :: Console",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: POSIX :: Linux",
+    ]
+keywords = [
+    "mcstas",
+    "jupyter",
+    "wrapper",
+    ]
+#requires_python = ">=3.6"
+#requires_python = ">=3.6"
+
+[project.urls]
+Homepage="https://github.com/tincotema/mcstas-python-wrapper"
+Issues = "https://github.com/tincotema/mcstas-python-wrapper/issues"
+
+[tool.setuptools]
+packages = ["mcpw"]
+
+[project.scripts]
+mcpw_setup = "mcpw.setup:main"
+mcpw_manager = "mcpw.manager:main"
