@@ -344,6 +344,27 @@ def load_var_list(file_path):
             var_list[x+1][y] = float(var_list[x+1][y])
     return var_list
 
+def mcvar_list(mcvar, var_list = []):
+    mcvar_list = []
+    step = mcvar.copy()
+    if scan_name(mcvar) and var_list:
+        print("error scan object and var_list exist simultaneously")
+        exit()
+    if var_list:
+        for i in range(len(var_list)-1):
+            for j, name in enumerate(var_list[0]):
+                if name in mcvar.keys():
+                    step[name]=var_list[i+1][j]
+            mcvar_list.append(step)
+    elif scan_name(mcvar):
+        name=scan_name(mcvar)
+        for i in range(scan(mcvar).N):
+            step[name]=scan(mcvar).start+scan(mcvar).step*i
+            mcvar_list.append(step)
+    else:
+        mcvar_list.append(mcvar)
+    return mcvar_list
+
 def save_var_list(var_list, filename):
     with open(filename, mode='w') as csvfile:
         w = csv.writer(csvfile)

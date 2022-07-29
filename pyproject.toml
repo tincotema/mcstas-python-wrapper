@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcpw"
-version = "0.6.0"
+version = "0.6.1"
 authors = [{name="Tincotema",email="tincotema@genthree.io"}]
 maintainers = [{name="Tincotema",email="tincotema@genthree.io"}]
 description = "A lightweight and versitile McStas Python Wrapper for console and jupyter notebook"

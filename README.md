@@ -30,6 +30,12 @@ else:
 
 ## Update Notifications
 
+### 0.6.1:
+
+strings are now supported for mcstas variables
+
+added function mcvar_list
+
 ### 0.6.0:
 
 "var_list" file renamed to "var_list.csv". This needs to be updated manually in older simulation_results foulders
@@ -302,6 +308,11 @@ custom function to get detector output and optionaly plot them directly by handy
 	array, dict = mcpw.mcstas_wrapper.return_detector(var,mcvar, detector = "name"[, N=-1, plot=axis])
 
 dict contains more information about the detector
+
+#### mcvar_list
+returns a list of mcvar dicts coresponnding to scans or var_list. if nither is given, the output still has length 1 with the original mcvar dict.
+
+	array = mcpw.mcstas_wrapper.mcvar_list(mcvar [,var_list=[]])
 
 ##### 1D detector:
 array shape:	x	  = array[0]  
