@@ -116,7 +116,7 @@ def main():
         # Fallback to --help.
         parser.print_help()
     else:
-        (mcvar["sim"],msg) = get_result_path_from_input(var, mcvar, msg, args) # logic for retreiveng the correct name for the result foulder
+        (mcvar["sim"],msg) = get_result_path_from_input(var, mcvar, args, msg) # logic for retreiveng the correct name for the result foulder
         valid_mcconfig(var,mcvar)
         if args.func == 'analyse':
             try:
@@ -150,6 +150,7 @@ def main():
             run_mcstas(var,mcvar)
             run_compiler(var,mcvar)
             var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
+            print(msg)
             run_instrument(var,mcvar,var_list)
             check_for_detector_output(var,mcvar,var_list)
             save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list.csv')  #save mcstas variables
@@ -160,6 +161,7 @@ def main():
             run_mcstas(var,mcvar)
             run_compiler(var,mcvar)
             var,mcvar,var_list=pre_simulation(var,mcvar,var_list)
+            print(msg)
             run_instrument(var,mcvar,var_list)
             check_for_detector_output(var,mcvar,var_list)
             save_var_list(var_list, var['sim_res']/mcvar["sim"]/'var_list.csv')  #save mcstas variables
@@ -170,6 +172,7 @@ def main():
         elif args.func == 'custom':
             run_mcstas(var,mcvar)
             run_compiler(var,mcvar)
+            print(msg)
             custom = vars(pyinstr)['custom']
             custom(var,mcvar,var_list)
             analyse(var, mcvar)                                               #call analyse, defined in reseda.py

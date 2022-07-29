@@ -227,7 +227,10 @@ def run_instrument(var,mcvar,var_list):
     from mccode import McStasResult
     errormsg = "The Simmulation Failed"
     successmsg = "The simmulation compleated successfully"
-    no_use_vars = ["scan", "n", "sim", "instr_file"]
+    if var_list:
+        no_use_vars = ["n", "sim", "instr_file"]+var_list[0]
+    else:
+        no_use_vars = ["n", "sim", "instr_file"]
     if os.name=='nt':
         instr_out_file = mcvar['instr_file'].split('.')[0] + ".exe"
     else:
@@ -243,46 +246,43 @@ def run_instrument(var,mcvar,var_list):
             run_string = f"mpiexec -np {var['mpi']} {var['p_local']/instr_out_file} -n {str(mcvar['n'])} "
         else:
             run_string = f"mpirun --use-hwthread-cpus -np {var['mpi']} {var['p_local']/instr_out_file} -n {str(mcvar['n'])} "
+    #----------------------------------------------------------#
     # parsing the parameters and checking if a scan is required
     for var_name, var_value in mcvar.items():
-    #for var_name, var_value in mcvar.__dict__.items():
         if not (var_name in no_use_vars):
             if isinstance(var_value, Scan):
                 scan_var = [var_name, var_value]
             else:
-                params = params + f"{var_name}={var_value} "
+                if isinstance(var_value, str):
+                    params = params + f"{var_name}='{var_value}' "
+                else:
+                    params = params + f"{var_name}={var_value} "
     # scan or no scan
     if var_list:
-        params = ''
+        if scan_var:
+            sys.exit("VALUE ERROR: You can not have a Scan and the list opiton at the same time.\n Exiting")
         dets_vals = []
         #creating main result directory
         os.mkdir(var['sim_res']/mcvar['sim'])
-        for name in var_list[0]:
-            if not name.startswith('#'):
-                no_use_vars.append(name)
+        # enter single simulation steps:
         for i in range(len(var_list)-1):
+            step_params = params
             value_list=[]
             print(f"step:{i+1}/{len(var_list)-1}")
             for j, name in enumerate(var_list[0]):
                 if not name.startswith('#'):
-                    params = params + f"{name}={var_list[i+1][j]} "
-                    value_list.append(str(var_list[i+1][j]))
-            for var_name, var_value in mcvar.items():
-            #for var_name, var_value in mcvar.__dict__.items():
-                if not (var_name in no_use_vars):
-                    if isinstance(var_value, Scan):
-                        sys.exit("VALUE ERROR: You can not have a Scan and the list opiton at the same time.\n Exiting")
+                    if isinstance(var_list[i+1][j],str):
+                        step_params = step_params + f"{name}='{var_list[i+1][j]}' "
                     else:
-                        params = params + f"{var_name}={var_value} "
-            final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {params} "
-
+                        step_params = step_params + f"{name}={var_list[i+1][j]} "
+                    value_list.append(str(var_list[i+1][j]))
+            final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {step_params} "
             out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'])
             temp = sys.stdout
             sys.stdout = DummyFile()
             dets=McStasResult(out.stdout).get_detectors()
             sys.stdout = temp
             for det in dets:
-                #print(f'det.intensity: {det.intensity}, det.error: {det.error}')
                 value_list.append(str(det.intensity))
                 value_list.append(str(det.error))
             res_list.append(var['sim_res']/mcvar['sim']/str(i))
@@ -300,12 +300,12 @@ def run_instrument(var,mcvar,var_list):
         for i in range (scan_var[1].N):
             value_list=[str(scan_var[1].absolute_value(i))]
             print(f"step: {scan_var[0]}={scan_var[1].absolute_value(i)}")
-            i_params = params + f"{scan_var[0]}={scan_var[1].absolute_value(i)} "
-            final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {i_params} "
-
+            step__params = params + f"{scan_var[0]}={scan_var[1].absolute_value(i)} "
+            final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {step__params} "
+            print(final_run_string)
+            out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'])
             temp = sys.stdout
             sys.stdout = DummyFile()
-            out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'])
             dets=McStasResult(out.stdout).get_detectors()
             sys.stdout = temp
             for det in dets:
@@ -350,13 +350,13 @@ def save_var_list(var_list, filename):
         for i in range(len(var_list)):
             w.writerow(var_list[i])
 
-def check_scan(var, mcvar, msg): #ignore for now, is something i might implement later fully
-    dir_num = len(os.listdir(var['sim_res']/mcvar['sim']))
-    if dir_num-4 == scan(mcvar).N:
-        return True
-    else:
-        msg = msg + f"the number of result folders dont correspont to the number of steps (#Dir:{dir_num} vs scan.N:{scan(mcvar).N})\n"
-        return False
+#def check_scan(var, mcvar, msg): #ignore for now, is something i might implement later fully
+#    dir_num = len(os.listdir(var['sim_res']/mcvar['sim']))
+#    if dir_num-4 == scan(mcvar).N:
+#        return True
+#    else:
+#        msg = msg + f"the number of result folders dont correspont to the number of steps (#Dir:{dir_num} vs scan.N:{scan(mcvar).N})\n"
+#        return False
 
 def scan_name(mcvar):
     for var_name, var_value in mcvar.items():
@@ -384,7 +384,7 @@ def check_for_detector_output(var, mcvar, var_list):
             #print("all fine")
             return
 
-def get_result_path_from_input(var, mcvar, msg, args):# logic for retreiveng the correct name for the result foulder
+def get_result_path_from_input(var, mcvar, args, msg=""):# logic for retreiveng the correct name for the result foulder
     if args.func == 'analyse':
         if args.result_dir:
             return args.result_dir, msg
