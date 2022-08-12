@@ -597,7 +597,13 @@ def return_detector(var,mcvar, detector, N=-1, plot=None):
             intensity.append(readout[int(len(readout)/3):int(len(readout)*2/3)])
             intensity.append(readout[int(len(readout)*2/3):int(len(readout))])
             if plot:
-                plot.imshow(intensity[0], extent=comments["xylimits"])
+                xmin,xmax,ymin,ymax = comments["xylimits"]
+                mysize = intensity[0].shape
+                x =  np.linspace(xmin,xmax,mysize[1])
+                y =  np.linspace(ymin,ymax,mysize[0])
+                plot.set_xlim(xmin,xmax)
+                plot.set_ylim(ymin,ymax)
+                plot.pcolor(x,y,intensity[0])
                 plot.set_xlabel(comments["xlabel"])
                 plot.set_ylabel(comments["ylabel"])
                 plot.set_title(comments["title"])
