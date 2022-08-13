@@ -7,8 +7,10 @@ import locale
 from shutil import copyfile, which
 import csv
 from datetime import datetime
+import time
 import re
 import numpy as np
+from decimal import Decimal
 
 class DummyFile(object):
     def write(self, x): pass
@@ -32,23 +34,70 @@ def scan(mcvar):
     print("no object of Class Scan found")
     return None
 
-def execute(command, errormsg, successmsg, print_command=True, verbose=False):
-    if print_command:
+def execute(command, errormsg, successmsg, print_command=True, verbose=False,mpi = -1):
+    if print_command or verbose:
         print(f"runing: {command}")
-    run_return = sp.run(command, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE)
-    # check if the process was successfully
-    if run_return.returncode != 0:
-        print(f"\nreturn code:{run_return.returncode}")
-        print(f"stdout:\n{run_return.stdout}")
-        print(f"stderr:\n{run_return.stderr}\n")
+    #run_return = sp.run(command, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE)
+    p = sp.Popen(command,shell=True, text=True,encoding="utf8", stdout=sp.PIPE, stderr=sp.PIPE)
+    #process output to monitor progress
+    if mpi > -1:
+        stdout =""
+        stderr =""
+        trace=0
+        i = 0
+        len_percent=0
+        while True:
+            out = os.read(p.stdout.fileno(), 1024).decode("utf8")
+            for line in out.split("\n"):
+                if line.__contains__("Trace ETA")and trace==0:
+                    if i >= mpi-1:
+                        trace=1
+                        sys.stdout.write(f"{line.split('Detector')[0]}")
+                        len_percent=len(line.split("Detector")[0].split("%")[1].lstrip())
+                        sys.stdout.flush()
+                    i+=1
+                elif trace==1:
+                    if line.__contains__("Detector") or line.startswith("Save"):
+                        pass
+                    elif line.startswith("Finally"):
+                        print("")
+                        break
+                    else:
+                        for l in line.split(" "):
+                            if l:
+                                try:
+                                    percent = str(int(l))
+                                    string = "".join(["\b"]*(len_percent))+percent
+                                    len_percent = len(percent)
+                                    sys.stdout.write(string)
+                                    sys.stdout.flush()
+                                except Exception as e:
+                                    print("")
+                                    trace=2
+            time.sleep(0.5)
+            stdout = stdout+out
+            if out == '' and p.poll() is not None:
+                break
+
+
+        stdout = stdout+p.stdout.read()
+        stderr = stderr+p.stderr.read()
+        p.stdout.close()
+        p.stderr.close()
+    else:
+        stdout, stderr = p.communicate()
+    if p.returncode != 0:
+        print(f"\nreturn code:{p.returncode}")
+        print(f"stdout:\n{stdout}")
+        print(f"stderr:\n{stderr}\n")
         sys.exit(errormsg)
     else:
         if verbose:
-            print(f"\nreturn code:{run_return.returncode}")
-            print(f"stdout:\n{run_return.stdout}")
-            print(f"stderr:\n{run_return.stderr}\n")
+            print(f"\nreturn code:{p.returncode}")
+            print(f"stdout:\n{stdout}")
+            print(f"stderr:\n{stderr}\n")
         print(f"{successmsg}\n")
-    return run_return
+    return stdout
 
 def valid_config(var):
     #check dirs
@@ -85,7 +134,9 @@ def valid_mcconfig(var,mcvar):
     if not isfile(var['p_local']/mcvar['instr_file']):
         sys.exit(f"\nthe instrument file '{mcvar['instr_file']}' dose not exist")
 
-    if var['mpi'] == 0:
+    if var['mpi'] < 0:
+        sys.exit(f"\nmpi variable must be equal or greater than 0")
+    elif var['mpi'] == 0:
         # test if gcc exists
         if not which("gcc"):
             sys.exit(f"\ngcc is not installed. please install it")
@@ -216,15 +267,10 @@ def run_compiler(var,mcvar, cflags=""):
             run_string = f"mpicc -DUSE_MPI "
     run_string = run_string + f"-o {var['p_local']/instr_out_file} {var['p_local']/instr_c_file} -lm -g -O2 -std=c99 {cflags}"
     # exectue the run_string and capture the output
-    execute(run_string, "An error occurred while running the C Compiler", "C compiler done", verbose=var["verbose"])
+    execute(run_string, "An error occurred while running the C Compiler", "C compiler done", verbose=var["verbose"], mpi = var["mpi"])
 
 # (mpirun -np 2) instr.out -n -d var=value
 def run_instrument(var,mcvar,var_list):
-    if os.name == "nt":
-        sys.path.append(f"{os.path.dirname(var['mcstas'])}/../lib/tools/Python/mcrun")
-    else:
-        sys.path.append(f"{os.path.dirname(var['mcstas'])}/../tools/Python/mcrun")
-    from mccode import McStasResult
     errormsg = "The Simmulation Failed"
     successmsg = "The simmulation compleated successfully"
     if var_list:
@@ -240,7 +286,7 @@ def run_instrument(var,mcvar,var_list):
     res_list = []
     #check if mpi is enabled
     if var['mpi'] == 0:
-        run_string = f"{var['p_local']/instr_out_file} -n {str(mcvar['n'])} "
+        run_string = f"{var['p_local']/instr_out_file} -n {str(int(mcvar['n']))} "
     else:
         if os.name=='nt':
             run_string = f"mpiexec -np {var['mpi']} {var['p_local']/instr_out_file} -n {str(mcvar['n'])} "
@@ -277,14 +323,13 @@ def run_instrument(var,mcvar,var_list):
                         step_params = step_params + f"{name}={var_list[i+1][j]} "
                     value_list.append(str(var_list[i+1][j]))
             final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {step_params} "
-            out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'])
-            temp = sys.stdout
-            sys.stdout = DummyFile()
-            dets=McStasResult(out.stdout).get_detectors()
-            sys.stdout = temp
+            out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'], mpi = var["mpi"])
+            DETECTOR_RE = r'Detector: ([^\s]+)_I=([^ ]+) \1_ERR=([^\s]+) \1_N=([^ ]+) "([^"]+)"'
+            # res = array of: name, intensity,error,count,path
+            dets=re.findall(DETECTOR_RE, out)
             for det in dets:
-                value_list.append(str(det.intensity))
-                value_list.append(str(det.error))
+                value_list.append(str(Decimal(det[1])))   #intensity
+                value_list.append(str(Decimal(det[2])))       #error
             res_list.append(var['sim_res']/mcvar['sim']/str(i))
             dets_vals.append(value_list)
         create_sim_file(dets, var, mcvar, var_list)
@@ -296,28 +341,27 @@ def run_instrument(var,mcvar,var_list):
         os.mkdir(var['sim_res']/mcvar['sim'])
         dets_vals = []
         #scanning all points
-        print(f"running: {run_string} {scan_var[0]}={scan_var[1].mc}\n")
+        print(f"running scan: {scan_var[0]}={scan_var[1].mc}\n")
         for i in range (scan_var[1].N):
             value_list=[str(scan_var[1].absolute_value(i))]
-            print(f"step: {scan_var[0]}={scan_var[1].absolute_value(i)}")
+            print(f"step {i+1}/{scan_var[1].N}: {scan_var[0]}={scan_var[1].absolute_value(i)}")
             step__params = params + f"{scan_var[0]}={scan_var[1].absolute_value(i)} "
             final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {step__params} "
-            print(final_run_string)
-            out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'])
-            temp = sys.stdout
-            sys.stdout = DummyFile()
-            dets=McStasResult(out.stdout).get_detectors()
-            sys.stdout = temp
+            out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'], mpi = var["mpi"])
+            #result_handeling
+            DETECTOR_RE = r'Detector: ([^\s]+)_I=([^ ]+) \1_ERR=([^\s]+) \1_N=([^ ]+) "([^"]+)"'
+            # res = array of: name, intensity,error,count,path
+            dets=re.findall(DETECTOR_RE, out)
             for det in dets:
-                value_list.append(str(det.intensity))
-                value_list.append(str(det.error))
+                value_list.append(str(Decimal(det[1])))   #intensity
+                value_list.append(str(Decimal(det[2])))       #error
             res_list.append(var['sim_res']/mcvar['sim']/str(i))
             dets_vals.append(value_list)
         create_sim_file(dets, var, mcvar, var_list)
         create_dat_file(dets, var, mcvar, var_list, dets_vals)
     else:
         final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim'])} {params} "
-        execute(final_run_string, errormsg, successmsg, verbose=var['verbose'])
+        execute(final_run_string, errormsg, successmsg, verbose=var['verbose'], mpi = var["mpi"])
         res_list.append(var['sim_res']/mcvar['sim'])
     return res_list
 
@@ -439,7 +483,7 @@ def mcplot(var,mcvar,msg='', mode='qt'):
 def create_sim_file(dets, var, mcvar,var_list):
     if var_list:
         steps = len(var_list)-1
-        scan_names = ", ".join(filter(lambda x: x.startswith('#'),var_list[0]))
+        scan_names = ", ".join(filter(lambda x: not x.startswith('#'),var_list[0]))
         params = ""
         for i in range(len(var_list[0])):
             if not var_list[0][i].startswith("#"):
@@ -454,7 +498,7 @@ def create_sim_file(dets, var, mcvar,var_list):
         xlimits = f" {scan(mcvar).start} {scan(mcvar).stop}"
     lines = []
     lines.append(f'begin instrument:')
-    version = execute(f"{var['mcstas']} -v", "","",print_command=False).stdout.split(" ")[2]
+    version = sp.run(f"{var['mcstas']} -v",text=True, shell=True, stdout=sp.PIPE).stdout.split(" ")[2]
     lines.append(f'  Creator: mcstas {version}')
     lines.append(f"  Source: {mcvar['instr_file']}")
     lines.append(f'  Parameters: {scan_names}')
@@ -477,8 +521,8 @@ def create_sim_file(dets, var, mcvar,var_list):
     det_string=""
     variables_string=""
     for det in dets:
-        det_string+= f' ({det.name}_I,{det.name}_ERR)'
-        variables_string+= f' {det.name}_I {det.name}_ERR'
+        det_string+= f' ({det[0]}_I,{det[0]}_ERR)'
+        variables_string+= f' {det[0]}_I {det[0]}_ERR'
     lines.append(f'yvars:{det_string}')
     lines.append(f"xlabel: '{scan_names}'")
     lines.append(f"ylabel: 'Intensity'")
@@ -494,7 +538,7 @@ def create_sim_file(dets, var, mcvar,var_list):
 def create_dat_file(dets, var, mcvar, var_list, dets_vals):
     if var_list:
         steps = len(var_list)-1
-        scan_names = ", ".join(filter(lambda x: x.startswith('#'),var_list[0]))
+        scan_names = ", ".join(filter(lambda x: not x.startswith('#'),var_list[0]))
         params = ""
         for i in range(len(var_list[0])):
             if not var_list[0][i].startswith("#"):
@@ -520,8 +564,8 @@ def create_dat_file(dets, var, mcvar, var_list, dets_vals):
     det_string=""
     variables_string=""
     for det in dets:
-        det_string+= f' ({det.name}_I,{det.name}_ERR)'
-        variables_string+= f' {det.name}_I {det.name}_ERR'
+        det_string+= f' ({det[0]}_I,{det[0]}_ERR)'
+        variables_string+= f' {det[0]}_I {det[0]}_ERR'
     lines.append(f'# yvars:{det_string}')
     lines.append(f'# xlimits:{xlimits}')
     lines.append(f'# filename: mccode.dat')
