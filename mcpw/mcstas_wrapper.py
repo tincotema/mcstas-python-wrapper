@@ -269,20 +269,38 @@ def run_compiler(var,mcvar, cflags=""):
     # exectue the run_string and capture the output
     execute(run_string, "An error occurred while running the C Compiler", "C compiler done", verbose=var["verbose"], mpi = var["mpi"])
 
+def mcvar_list(mcvar, var_list = []):
+    mcvar_list = []
+    if scan_name(mcvar) and var_list:
+        print("error scan object and var_list exist simultaneously")
+        exit()
+    if var_list:
+        for i in range(len(var_list)-1):
+            step = mcvar.copy()
+            for j, name in enumerate(var_list[0]):
+                if name in mcvar.keys():
+                    step[name]=var_list[i+1][j]
+            mcvar_list.append(step)
+    elif scan_name(mcvar):
+        name=scan_name(mcvar)
+        for i in range(scan(mcvar).N):
+            step = mcvar.copy()
+            step[name]=scan(mcvar).absolute_value(i)
+            mcvar_list.append(step)
+    else:
+        mcvar_list.append(mcvar)
+    return mcvar_list
+
 # (mpirun -np 2) instr.out -n -d var=value
 def run_instrument(var,mcvar,var_list):
     errormsg = "The Simmulation Failed"
     successmsg = "The simmulation compleated successfully"
-    if var_list:
-        no_use_vars = ["n", "sim", "instr_file"]+var_list[0]
-    else:
-        no_use_vars = ["n", "sim", "instr_file"]
+    no_use_vars = ["n", "sim", "instr_file"]
     if os.name=='nt':
         instr_out_file = mcvar['instr_file'].split('.')[0] + ".exe"
     else:
         instr_out_file = mcvar['instr_file'].split('.')[0] + ".out"
     params = ''
-    scan_var = []
     res_list = []
     #check if mpi is enabled
     if var['mpi'] == 0:
@@ -294,35 +312,30 @@ def run_instrument(var,mcvar,var_list):
             run_string = f"mpirun --use-hwthread-cpus -np {var['mpi']} {var['p_local']/instr_out_file} -n {str(mcvar['n'])} "
     #----------------------------------------------------------#
     # parsing the parameters and checking if a scan is required
-    for var_name, var_value in mcvar.items():
-        if not (var_name in no_use_vars):
-            if isinstance(var_value, Scan):
-                scan_var = [var_name, var_value]
-            else:
+    mcvars = mcvar_list(mcvar,var_list)
+    # creating main directory for scans and var_lists if needed
+    if len(mcvars) > 1:
+        dets_vals = []
+        os.mkdir(var['sim_res']/mcvar['sim'])
+    # iter mcvars and create parameter string
+    for i in range(len(mcvars)):
+        step_params = params
+        for var_name, var_value in mcvars[i].items():
+            if not (var_name in no_use_vars):
                 if isinstance(var_value, str):
-                    params = params + f"{var_name}='{var_value}' "
+                    step_params = step_params + f"{var_name}='{var_value}' "
                 else:
-                    params = params + f"{var_name}={var_value} "
-    # scan or no scan
-    if var_list:
-        if scan_var:
-            sys.exit("VALUE ERROR: You can not have a Scan and the list opiton at the same time.\n Exiting")
-        dets_vals = []
-        #creating main result directory
-        os.mkdir(var['sim_res']/mcvar['sim'])
-        # enter single simulation steps:
-        for i in range(len(var_list)-1):
-            step_params = params
+                    step_params = step_params + f"{var_name}={var_value} "
+        # if no scan or var_list. this is all
+        if len(mcvars)==1:
+            final_run_string = run_string + f"-d {str(var['sim_res']/mcvars[i]['sim'])} {step_params} "
+            execute(final_run_string, errormsg, successmsg, verbose=var['verbose'], mpi = var["mpi"])
+            res_list.append(var['sim_res']/mcvars[i]['sim'])
+        # scans and var_lists, a bit more to do
+        else:
             value_list=[]
-            print(f"step:{i+1}/{len(var_list)-1}")
-            for j, name in enumerate(var_list[0]):
-                if not name.startswith('#'):
-                    if isinstance(var_list[i+1][j],str):
-                        step_params = step_params + f"{name}='{var_list[i+1][j]}' "
-                    else:
-                        step_params = step_params + f"{name}={var_list[i+1][j]} "
-                    value_list.append(str(var_list[i+1][j]))
-            final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {step_params} "
+            print(f"step:{i+1}/{len(mcvars)}")
+            final_run_string = run_string + f"-d {str(var['sim_res']/mcvars[i]['sim']/str(i))} {step_params} "
             out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'], mpi = var["mpi"])
             DETECTOR_RE = r'Detector: ([^\s]+)_I=([^ ]+) \1_ERR=([^\s]+) \1_N=([^ ]+) "([^"]+)"'
             # res = array of: name, intensity,error,count,path
@@ -330,39 +343,12 @@ def run_instrument(var,mcvar,var_list):
             for det in dets:
                 value_list.append(str(Decimal(det[1])))   #intensity
                 value_list.append(str(Decimal(det[2])))       #error
-            res_list.append(var['sim_res']/mcvar['sim']/str(i))
+            res_list.append(var['sim_res']/mcvars[i]['sim']/str(i))
             dets_vals.append(value_list)
+    # for scans and var_lists mccode.sim and mcode.dat needs to be created
+    if len(mcvars) > 1:
         create_sim_file(dets, var, mcvar, var_list)
         create_dat_file(dets, var, mcvar, var_list, dets_vals)
-
-    elif scan_var:
-        #scan
-        #creating main result directory
-        os.mkdir(var['sim_res']/mcvar['sim'])
-        dets_vals = []
-        #scanning all points
-        print(f"running scan: {scan_var[0]}={scan_var[1].mc}\n")
-        for i in range (scan_var[1].N):
-            value_list=[str(scan_var[1].absolute_value(i))]
-            print(f"step {i+1}/{scan_var[1].N}: {scan_var[0]}={scan_var[1].absolute_value(i)}")
-            step__params = params + f"{scan_var[0]}={scan_var[1].absolute_value(i)} "
-            final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim']/str(i))} {step__params} "
-            out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'], mpi = var["mpi"])
-            #result_handeling
-            DETECTOR_RE = r'Detector: ([^\s]+)_I=([^ ]+) \1_ERR=([^\s]+) \1_N=([^ ]+) "([^"]+)"'
-            # res = array of: name, intensity,error,count,path
-            dets=re.findall(DETECTOR_RE, out)
-            for det in dets:
-                value_list.append(str(Decimal(det[1])))   #intensity
-                value_list.append(str(Decimal(det[2])))       #error
-            res_list.append(var['sim_res']/mcvar['sim']/str(i))
-            dets_vals.append(value_list)
-        create_sim_file(dets, var, mcvar, var_list)
-        create_dat_file(dets, var, mcvar, var_list, dets_vals)
-    else:
-        final_run_string = run_string + f"-d {str(var['sim_res']/mcvar['sim'])} {params} "
-        execute(final_run_string, errormsg, successmsg, verbose=var['verbose'], mpi = var["mpi"])
-        res_list.append(var['sim_res']/mcvar['sim'])
     return res_list
 
 def psave(obj, file_path):#saves the given object as a pickle dump in the given file (file gets created)
@@ -387,27 +373,6 @@ def load_var_list(file_path):
         for y in range(len(var_list[0])):
             var_list[x+1][y] = float(var_list[x+1][y])
     return var_list
-
-def mcvar_list(mcvar, var_list = []):
-    mcvar_list = []
-    step = mcvar.copy()
-    if scan_name(mcvar) and var_list:
-        print("error scan object and var_list exist simultaneously")
-        exit()
-    if var_list:
-        for i in range(len(var_list)-1):
-            for j, name in enumerate(var_list[0]):
-                if name in mcvar.keys():
-                    step[name]=var_list[i+1][j]
-            mcvar_list.append(step)
-    elif scan_name(mcvar):
-        name=scan_name(mcvar)
-        for i in range(scan(mcvar).N):
-            step[name]=scan(mcvar).start+scan(mcvar).step*i
-            mcvar_list.append(step)
-    else:
-        mcvar_list.append(mcvar)
-    return mcvar_list
 
 def save_var_list(var_list, filename):
     with open(filename, mode='w') as csvfile:
