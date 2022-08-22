@@ -29,6 +29,11 @@ else:
 	pip install mcpw
 
 ## Update Notifications
+### 0.6.2:
+
+Added support for Progress_bar component. Progress indicator is now visible to the user.
+fixed issue in mccode.dat generation
+
 
 ### 0.6.1:
 
@@ -222,7 +227,7 @@ Propertys of the Scan class are:
 ### Scaning with csv file
 
 Witch the -l, --list argument you can provide a csv file with datapoints.
-The first row has to be a header row containing the names of the variables below them. The names have to match with the once in you instrument.
+The first row has to be a header row containing the names of the variables below them. The names have to match with the once in you instrument and mcvar dict.
 Each row represents one simulation and has to be fully filled with values that can be cast to a python float.
 Variable that dont change at all dont need to be part of the list and will be taken from the mcvariable class.
 

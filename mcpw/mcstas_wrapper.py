@@ -52,14 +52,14 @@ def execute(command, errormsg, successmsg, print_command=True, verbose=False,mpi
                 if line.__contains__("Trace ETA")and trace==0:
                     if i >= mpi-1:
                         trace=1
-                        sys.stdout.write(f"{line.split('Detector')[0]}")
-                        len_percent=len(line.split("Detector")[0].split("%")[1].lstrip())
+                        sys.stdout.write(f"{line.split('Detector: ')[0]}")
+                        len_percent=len(line.split("Detector: ")[0].split("%")[1].lstrip())
                         sys.stdout.flush()
                     i+=1
                 elif trace==1:
-                    if line.__contains__("Detector") or line.startswith("Save"):
+                    if line.__contains__("Detector: ") or line.startswith("Save ["):
                         pass
-                    elif line.startswith("Finally"):
+                    elif line.startswith("Finally ["):
                         print("")
                         break
                     else:
@@ -269,27 +269,35 @@ def run_compiler(var,mcvar, cflags=""):
     # exectue the run_string and capture the output
     execute(run_string, "An error occurred while running the C Compiler", "C compiler done", verbose=var["verbose"], mpi = var["mpi"])
 
-def mcvar_list(mcvar, var_list = []):
-    mcvar_list = []
+def mcvar_list(mcvar, var_list = [], second_var_list=False):
     if scan_name(mcvar) and var_list:
         print("error scan object and var_list exist simultaneously")
         exit()
+    mcvar_list = []
+    values = []
     if var_list:
         for i in range(len(var_list)-1):
             step = mcvar.copy()
+            l = []
             for j, name in enumerate(var_list[0]):
                 if name in mcvar.keys():
                     step[name]=var_list[i+1][j]
+                    l.append(var_list[i+1][j])
             mcvar_list.append(step)
+            values.append(l)
     elif scan_name(mcvar):
         name=scan_name(mcvar)
         for i in range(scan(mcvar).N):
             step = mcvar.copy()
             step[name]=scan(mcvar).absolute_value(i)
             mcvar_list.append(step)
+            values.append([step[name]])
     else:
         mcvar_list.append(mcvar)
-    return mcvar_list
+    if second_var_list:
+        return mcvar_list, values
+    else:
+        return mcvar_list
 
 # (mpirun -np 2) instr.out -n -d var=value
 def run_instrument(var,mcvar,var_list):
@@ -312,7 +320,7 @@ def run_instrument(var,mcvar,var_list):
             run_string = f"mpirun --use-hwthread-cpus -np {var['mpi']} {var['p_local']/instr_out_file} -n {str(mcvar['n'])} "
     #----------------------------------------------------------#
     # parsing the parameters and checking if a scan is required
-    mcvars = mcvar_list(mcvar,var_list)
+    mcvars, step_values = mcvar_list(mcvar,var_list, second_var_list=True)
     # creating main directory for scans and var_lists if needed
     if len(mcvars) > 1:
         dets_vals = []
@@ -337,8 +345,11 @@ def run_instrument(var,mcvar,var_list):
             print(f"step:{i+1}/{len(mcvars)}")
             final_run_string = run_string + f"-d {str(var['sim_res']/mcvars[i]['sim']/str(i))} {step_params} "
             out = execute(final_run_string, errormsg, successmsg, print_command=False, verbose=var['verbose'], mpi = var["mpi"])
+
             DETECTOR_RE = r'Detector: ([^\s]+)_I=([^ ]+) \1_ERR=([^\s]+) \1_N=([^ ]+) "([^"]+)"'
-            # res = array of: name, intensity,error,count,path
+            #cuting out the beginning of the output to find only the last save event
+            out = out[out.rfind('Save ['):]
+            # dets = array of: name, intensity,error,count,path
             dets=re.findall(DETECTOR_RE, out)
             for det in dets:
                 value_list.append(str(Decimal(det[1])))   #intensity
@@ -348,7 +359,7 @@ def run_instrument(var,mcvar,var_list):
     # for scans and var_lists mccode.sim and mcode.dat needs to be created
     if len(mcvars) > 1:
         create_sim_file(dets, var, mcvar, var_list)
-        create_dat_file(dets, var, mcvar, var_list, dets_vals)
+        create_dat_file(dets, var, mcvar, var_list, dets_vals, step_values)
     return res_list
 
 def psave(obj, file_path):#saves the given object as a pickle dump in the given file (file gets created)
@@ -500,7 +511,7 @@ def create_sim_file(dets, var, mcvar,var_list):
         for line in lines:
             simfile.write("{}\n".format(line))
 
-def create_dat_file(dets, var, mcvar, var_list, dets_vals):
+def create_dat_file(dets, var, mcvar, var_list, dets_vals, step_values):
     if var_list:
         steps = len(var_list)-1
         scan_names = ", ".join(filter(lambda x: not x.startswith('#'),var_list[0]))
@@ -535,8 +546,8 @@ def create_dat_file(dets, var, mcvar, var_list, dets_vals):
     lines.append(f'# xlimits:{xlimits}')
     lines.append(f'# filename: mccode.dat')
     lines.append(f'# variables: {scan_names.replace(",","")}{variables_string}')
-    for row in dets_vals:
-        lines.append(f'{" ".join(row)}')
+    for i, row in enumerate(dets_vals):
+        lines.append(f'{" ".join(map(str,step_values[i]))} {" ".join(row)}')
 
     with open(var['sim_res']/mcvar['sim']/'mccode.dat', "w") as simfile:
         for line in lines:
