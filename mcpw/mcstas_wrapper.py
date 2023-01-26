@@ -329,7 +329,8 @@ def run_instrument(var,mcvar,var_list):
     for i in range(len(mcvars)):
         step_params = params
         for var_name, var_value in mcvars[i].items():
-            if not (var_name in no_use_vars):
+            if not (var_name in no_use_vars) and not var_name.startswith('#'):
+
                 if isinstance(var_value, str):
                     step_params = step_params + f"{var_name}='{var_value}' "
                 else:

@@ -86,6 +86,7 @@ def main():
     mcvariables = vars(pyinstr)['mcvariables']
     mcvar = vars(pyinstr)['mcvariables']
     analyse = vars(pyinstr)['analyse']
+    # move import to case calls so custom dose not need them
     post_simulation = vars(pyinstr)['post_simulation']
     pre_simulation = vars(pyinstr)['pre_simulation']
     # initializing mcvariables class
