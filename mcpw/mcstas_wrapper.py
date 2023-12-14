@@ -447,13 +447,25 @@ def get_result_path_from_input(var, mcvar, args, msg=""):# logic for retreiveng 
             return new_name, msg
     return name, msg
 
-def mcplot(var,mcvar,msg='', mode='qt'):
+def mcplot(var,mcvar,msg='', mode=''):
     if mode == 'qt':
         run_string= f"{dirname(var['mcstas'])}/mcplot-pyqtgraph "
     else:
         run_string= f"{dirname(var['mcstas'])}/mcplot-matplotlib "
     run_string=run_string+f"{var['sim_res']/mcvar['sim']}"
-    sp.run(run_string, shell=True)
+    run_return = sp.run(run_string, shell=True, text=True, stderr=sp.PIPE)
+    # check if the process was successfull
+    if run_return.returncode != 0:
+        print(f"\nreturn code:{run_return.returncode}\n")
+        #print(run_return.stdout)
+        print(run_return.stderr)
+        sys.exit(f"An error occurred while running mcplot-{'pyqtgraph' if mode == 'qt' else 'matplotlib'}")
+    else:
+        if var["verbose"]:
+            print(f"\nreturn code:{run_return.returncode}\n")
+            #print(run_return.stdout)
+            print(run_return.stderr)
+        print(f"mcplot done\n")
 
 
 
