@@ -5,12 +5,11 @@ import subprocess as sp              #needed to run mcstas
 import argparse
 import os
 from importlib import import_module
-from mcpw.mcstas_wrapper import run_mcstas, run_compiler, run_instrument,\
+from .mcstas_wrapper import run_mcstas, run_compiler, run_instrument,\
                             valid_config, valid_mcconfig,\
                             psave, pload, load_var_list, save_var_list,\
                             check_for_detector_output, get_result_path_from_input
 from os.path import isfile, isabs
-import csv
 #for exeption handling
 class ArgumentParserError(Exception):
     pass
@@ -71,7 +70,8 @@ def main():
     # importing var and mcvar from local_var['port']py and reseda.py files
     sys.path.append(os.getcwd())
     sys.path.append(os.path.dirname(args.python_file))
-    from local_var import variables  as var
+    from local_var import variables  as var    #pyright: ignore
+    #TODO add try except for local_var import
     #initializing and validating local vars
     #var = variables()
     valid_config(var)
@@ -83,7 +83,6 @@ def main():
     #importing python_file as module
     pyinstr = import_module(f"{os.path.basename(args.python_file).split('.')[0]}")
     # pulling relevant functions and classes from python file
-    mcvariables = vars(pyinstr)['mcvariables']
     mcvar = vars(pyinstr)['mcvariables']
     analyse = vars(pyinstr)['analyse']
     # move import to case calls so custom dose not need them

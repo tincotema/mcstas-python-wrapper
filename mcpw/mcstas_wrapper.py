@@ -2,7 +2,7 @@ import subprocess as sp              #needed to run mcstas
 import sys                           #needed to select program mode of this script
 import pickle                        #needed to save mcstas variables for later use
 import os
-from os.path import isfile, isdir, isabs, dirname, basename, splitext, join, islink
+from os.path import isfile, isdir, isabs, dirname, basename,  islink
 import locale
 from shutil import copyfile, which
 import csv
@@ -11,9 +11,7 @@ import time
 import re
 import numpy as np
 from decimal import Decimal
-
-class DummyFile(object):
-    def write(self, x): pass
+from typing import Any
 
 class Scan():#helping class for easyer use of the scan funktionality of mcstas, needs start and stop value and the unit of the values as well the numbers of steps
     def __init__(self, start, stop, unit, N):
@@ -27,8 +25,8 @@ class Scan():#helping class for easyer use of the scan funktionality of mcstas, 
     def absolute_value(self, n):
         return self.step * n + self.start
 
-def scan(mcvar):
-    for key,value in mcvar.items():
+def scan(mcvar) -> Any:
+    for value in mcvar.values():
         if isinstance(value,Scan):
             return value
     print("no object of Class Scan found")
@@ -39,6 +37,8 @@ def execute(command, errormsg, successmsg, print_command=True, verbose=False,mpi
         print(f"runing: {command}")
     #run_return = sp.run(command, shell=True, text=True, stdout=sp.PIPE, stderr=sp.PIPE)
     p = sp.Popen(command,shell=True, text=True,encoding="utf8", stdout=sp.PIPE, stderr=sp.PIPE)
+    assert p.stdout is not None
+    assert p.stderr is not None
     #process output to monitor progress
     if mpi > -1:
         stdout =""
@@ -71,7 +71,7 @@ def execute(command, errormsg, successmsg, print_command=True, verbose=False,mpi
                                     len_percent = len(percent)
                                     sys.stdout.write(string)
                                     sys.stdout.flush()
-                                except Exception as e:
+                                except Exception:
                                     print("")
                                     trace=2
             time.sleep(0.5)
@@ -322,8 +322,9 @@ def run_instrument(var,mcvar,var_list):
     # parsing the parameters and checking if a scan is required
     mcvars, step_values = mcvar_list(mcvar,var_list, second_var_list=True)
     # creating main directory for scans and var_lists if needed
+    dets=[]
+    dets_vals = []
     if len(mcvars) > 1:
-        dets_vals = []
         os.mkdir(var['sim_res']/mcvar['sim'])
     # iter mcvars and create parameter string
     for i in range(len(mcvars)):
@@ -405,7 +406,7 @@ def scan_name(mcvar):
     #for var_name, var_value in mcvar.__dict__.items():
         if not var_name == "scan" and isinstance(var_value,Scan):
             return var_name
-    return False
+    return ""
 
 def check_for_detector_output(var, mcvar, var_list):
     if var_list:
@@ -447,7 +448,7 @@ def get_result_path_from_input(var, mcvar, args, msg=""):# logic for retreiveng 
             return new_name, msg
     return name, msg
 
-def mcplot(var,mcvar,msg='', mode=''):
+def mcplot(var,mcvar, mode=''):
     if mode == 'qt':
         run_string= f"{dirname(var['mcstas'])}/mcplot-pyqtgraph "
     else:
@@ -584,47 +585,47 @@ def return_detector(var,mcvar, detector, N=-1, plot=None):
                 freetext_pat = '.+'
                 comments = {}
 
-                m = re.search('\# title: (%s)' % freetext_pat, text)
+                m: Any = re.search(r'\# title: (%s)' % freetext_pat, text)
                 comments["title"] = m.group(1)
 
                 '''# xlabel: Wavelength [AA]'''
-                m = re.search('\# xlabel: (%s)' % freetext_pat, text)
+                m = re.search(r'\# xlabel: (%s)' % freetext_pat, text)
                 comments["xlabel"] = m.group(1)
                 '''# ylabel: Intensity'''
-                m = re.search('\# ylabel: (%s)' % freetext_pat, text)
+                m = re.search(r'\# ylabel: (%s)' % freetext_pat, text)
                 comments["ylabel"] = m.group(1)
-                m = re.search('\# zlabel: (%s)' % freetext_pat, text)
+                m = re.search(r'\# zlabel: (%s)' % freetext_pat, text)
                 comments["zlabel"] = m.group(1)
 
                 '''# xvar: L'''
-                m = re.search('\# xvar: (%s)' % freetext_pat, text)
+                m = re.search(r'\# xvar: (%s)' % freetext_pat, text)
                 comments["xvar"] = m.group(1)
                 '''# zvar: I '''
-                m = re.search('\# zvar: (%s)' % freetext_pat, text)
+                m = re.search(r'\# zvar: (%s)' % freetext_pat, text)
                 comments["zvar"] = m.group(1)
                 '''# yvar: (I,I_err)'''
-                m = re.search('\# yvar: (%s)' % freetext_pat, text)
+                m = re.search(r'\# yvar: (%s)' % freetext_pat, text)
                 comments["yvar"] = m.group(1)
 
                 '''
                 # xylimits: -30 30 -30 30
                 # xylimits: 0 5e+06 0.5 100
                 '''
-                m = re.search('\# xylimits: ([\d\.\-\+e]+) ([\d\.\-\+e]+) ([\d\.\-\+e]+) ([\d\.\-\+e]+)([\ \d\.\-\+e]*)', text)
+                m = re.search(r'\# xylimits: ([\d\.\-\+e]+) ([\d\.\-\+e]+) ([\d\.\-\+e]+) ([\d\.\-\+e]+)([\ \d\.\-\+e]*)', text)
                 comments["xylimits"] = (float(m.group(1)), float(m.group(2)), float(m.group(3)), float(m.group(4)))
 
                 '''# values: 6.72365e-17 4.07766e-18 4750'''
-                m = re.search('\# values: ([\d\-\+\.e]+) ([\d\-\+\.e]+) ([\d\-\+\.e]+)', text)
+                m = re.search(r'\# values: ([\d\-\+\.e]+) ([\d\-\+\.e]+) ([\d\-\+\.e]+)', text)
                 comments["vaules"] = (float(m.group(1)), float(m.group(2)),float(m.group(3)))
                 '''# statistics: X0=5.99569; dX=0.0266368;'''
-                m = re.search('\# statistics: X0=([\d\.\+\-e]+); dX=([\d\.\+\-e]+); Y0=([\d\.\+\-e]+); dY=([\d\.\+\-e]+);', text)
+                m = re.search(r'\# statistics: X0=([\d\.\+\-e]+); dX=([\d\.\+\-e]+); Y0=([\d\.\+\-e]+); dY=([\d\.\+\-e]+);', text)
                 comments["statistics"] = f'X0={m.group(1)}; dX={m.group(2)}; Y0={m.group(3)}; dY={m.group(4)}'
                 '''# signal: Min=0; Max=1.20439e-18; Mean=4.10394e-21;'''
-                m = re.search('\# signal: Min=([\ \d\.\+\-e]+); Max=([\ \d\.\+\-e]+); Mean=([\ \d\.\+\-e]+);', text)
+                m = re.search(r'\# signal: Min=([\ \d\.\+\-e]+); Max=([\ \d\.\+\-e]+); Mean=([\ \d\.\+\-e]+);', text)
                 comments["signal"] = f'Min={m.group(1)}; Max={m.group(2)}; Mean={m.group(3)}'
             except Exception as e:
                 print(e)
-                sys.exit(f"error while parsing detector {detctor}. Please ensure the format is correct.")
+                sys.exit(f"error while parsing detector {detector}. Please ensure the format is correct.")
             intensity = []
             intensity.append(readout[0:int(len(readout)/3)])
             intensity.append(readout[int(len(readout)/3):int(len(readout)*2/3)])
@@ -645,38 +646,38 @@ def return_detector(var,mcvar, detector, N=-1, plot=None):
             try:
                 freetext_pat = '.+'
                 comments = {}
-                m = re.search('\# title: (%s)' % freetext_pat, text)
+                m = re.search(r'\# title: (%s)' % freetext_pat, text)
                 comments["title"] = m.group(1)
                 '''# xlabel: Wavelength [AA]'''
-                m = re.search('\# xlabel: (%s)' % freetext_pat, text)
+                m = re.search(r'\# xlabel: (%s)' % freetext_pat, text)
                 comments["xlabel"] = m.group(1)
                 '''# ylabel: Intensity'''
-                m = re.search('\# ylabel: (%s)' % freetext_pat, text)
+                m = re.search(r'\# ylabel: (%s)' % freetext_pat, text)
                 comments["ylabel"] = m.group(1)
 
                 '''# xvar: L'''
-                m = re.search('\# xvar: ([\w]+)', text)
+                m = re.search(r'\# xvar: ([\w]+)', text)
                 comments["xvar"] = m.group(1)
                 '''# xlimits: 5.5 6.5'''
-                m = re.search('\# xlimits: ([\d\.\-\+e]+) ([\d\.\-\+e]+)', text)
+                m = re.search(r'\# xlimits: ([\d\.\-\+e]+) ([\d\.\-\+e]+)', text)
                 comments["xlimits"] = (float(m.group(1)),float(m.group(2)))
 
                 '''# yvar: (I,I_err)'''
-                m = re.search('\# yvar: \(([\w]+),([\w]+)\)', text)
+                m = re.search(r'\# yvar: \(([\w]+),([\w]+)\)', text)
                 comments["yvar"] = (m.group(1),m.group(2))
 
                 '''# values: 6.72365e-17 4.07766e-18 4750'''
-                m = re.search('\# values: ([\d\-\+\.e]+) ([\d\-\+\.e]+) ([\d\-\+\.e]+)', text)
+                m = re.search(r'\# values: ([\d\-\+\.e]+) ([\d\-\+\.e]+) ([\d\-\+\.e]+)', text)
                 comments["vaules"] = (float(m.group(1)), float(m.group(2)),float(m.group(3)))
                 '''# statistics: X0=5.99569; dX=0.0266368;'''
-                m = re.search('\# statistics: X0=([\d\.\-\+e]+); dX=([\d\.\-\+e]+);', text)
+                m = re.search(r'\# statistics: X0=([\d\.\-\+e]+); dX=([\d\.\-\+e]+);', text)
                 comments["statistics"] = f'X0={m.group(1)}; dX={m.group(2)}'
                 '''# signal: Min=0; Max=1.20439e-18; Mean=4.10394e-21;'''
-                m = re.search('\# signal: Min=([\ \d\.\+\-e]+); Max=([\ \d\.\+\-e]+); Mean=([\ \d\.\+\-e]+);', text)
+                m = re.search(r'\# signal: Min=([\ \d\.\+\-e]+); Max=([\ \d\.\+\-e]+); Mean=([\ \d\.\+\-e]+);', text)
                 comments["signal"] = f'Min={m.group(1)}; Max={m.group(2)}; Mean={m.group(3)}'
             except Exception as e:
                 print(e)
-                sys.exit(f"error while parsing detector {detctor}. Please ensure the format is correct.")
+                sys.exit(f"error while parsing detector {detector}. Please ensure the format is correct.")
             if plot:
                 xy=np.swapaxes(readout,0,1)
                 plot.errorbar(xy[0],xy[1],yerr=xy[2])

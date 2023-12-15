@@ -1,18 +1,17 @@
 # you schould not need to do anything in here
 import sys                           #needed for executing this sript in diverent modes
 import subprocess as sp              #needed to run mcstas
-import argparse
 import os
 import re
 from pathlib import Path
 from os.path import isdir, isfile, isabs, islink
-from mcpw.setup_tools import create_local_var, create_mcvar_dict
-from mcpw.mcstas_wrapper import run_mcstas, run_compiler,\
+from .setup_tools import create_mcvar_dict
+from .mcstas_wrapper import run_mcstas, run_compiler,\
                                 run_instrument, scan_name,\
                                 check_for_detector_output,\
                                 psave, pload, which, valid_config,\
                                 save_var_list, scan
-from mcpw.mcstas_wrapper import load_var_list as mcpw_load_var_list
+from .mcstas_wrapper import load_var_list as mcpw_load_var_list
 def load_mcvariables(var, sim=''): # loads used parameters from simulation
     if not sim:
         print('no result folder name given.\n please enter one as 2nd argument to this function.')
@@ -28,7 +27,6 @@ def load_var_list(var,mcvar):
         return []
 
 def simulate(var, mcvar, var_list=[], var_list_csv='', sim='', remote=False, recompile=False, verbose=False): #spawns a simulation if sim dose not jet exists and returns a list of result dirs
-    msg = ''
     #adding runtime variables to var
     var['recompile']=recompile
     var['verbose']=verbose
@@ -95,9 +93,9 @@ def simulate(var, mcvar, var_list=[], var_list_csv='', sim='', remote=False, rec
         return mcvar, res
 
 # helper function
-def print_mcvariable_from_instrument(instrument):
-    for line in create_class_mcvariables_lines(instrument):
-        print(line)
+#def print_mcvariable_from_instrument(instrument):
+#    for line in create_class_mcvariables_lines(instrument):
+#        print(line)
 
 # fuction to create local_var.py and load it
 def initialize(instrument='', working_dir=os.getcwd(), mcstas='mcstas', output_dir='simulation_results', component_dir='', mpi=0, ssh_server='', ssh_port=22, ssh_rate=0, ssh_path=".", cflags=""):

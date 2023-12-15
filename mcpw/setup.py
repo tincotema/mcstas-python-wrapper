@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
 # you schould not need to do anything in here
-import sys                           #needed for executing this sript in diverent modes
-import subprocess as sp              #needed to run mcstas
 import argparse
 import os
 import re
-from mcpw.setup_tools import create_local_var, create_python_file
+from .setup_tools import create_local_var, create_python_file
 
 
 
@@ -22,7 +20,7 @@ def main():
     # defining the argument parser for nice usage
     parser= ThrowingArgumentParser(description="Script to create a python file to control a McStas Instrument with MCPW")
 
-    subparsers = parser.add_subparsers(title="modes",
+    parser.add_subparsers(title="modes",
              description="Use 'manager mode --help' to view the help for any command.",
              metavar='mode')
 
