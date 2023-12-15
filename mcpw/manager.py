@@ -67,13 +67,16 @@ def main():
         exit(1)
 
 
-    # importing var and mcvar from local_var['port']py and reseda.py files
+    # importing var and mcvar from local_var['port']py and instrument.py files
     sys.path.append(os.getcwd())
     sys.path.append(os.path.dirname(args.python_file))
-    from local_var import variables  as var    #pyright: ignore
-    #TODO add try except for local_var import
+    try:
+        from local_var import variables  as var    #pyright: ignore
+    except ModuleNotFoundError:
+        sys.exit("local_var was not found in the local directory\nmake shure you are in the correct folder and that the folder contains the local_var.py file")
+    except ImportError:
+        sys.exit("an import error occured while trying to import local_var\nmake shure your local_var.py file has a dict called 'variables' and is a valid python file")
     #initializing and validating local vars
-    #var = variables()
     valid_config(var)
 
     # adding local working directory to PATH
