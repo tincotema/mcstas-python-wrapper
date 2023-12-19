@@ -35,7 +35,7 @@ def create_local_var_dict(args):
     local_var_dict_lines.append(f"    #mcstas variables")
     local_var_dict_lines.append(f'    "mpi"          : {args.mpi},')
     local_var_dict_lines.append(f"    #additional c compiler flags,")
-    local_var_dict_lines.append(f'    "cflags"       : ""')
+    local_var_dict_lines.append(f'    "cflags"       : "-O2"')
     local_var_dict_lines.append('    }')
 
     return local_var_dict_lines

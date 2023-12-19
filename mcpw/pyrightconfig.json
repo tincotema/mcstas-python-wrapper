@@ -1,0 +1,6 @@
+{
+	"include" : [
+		"mcpw"
+	],
+	"pythonPlatform": "All",
+}

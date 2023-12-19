@@ -241,7 +241,7 @@ def run_mcstas(var, mcvar):
         print(f"McStas compiler done\n")
 
 # gcc (mpicc) -o p_local/reseda.out p_local/reseda.c -lm (-DUSE_MPI) -g -O2 -lm -std=c99
-def run_compiler(var,mcvar, cflags=""):
+def run_compiler(var,mcvar):
     instr_c_file = mcvar['instr_file'].split('.')[0] + ".c"
     if os.name=='nt':
         instr_out_file = mcvar['instr_file'].split('.')[0] + ".exe"
@@ -265,7 +265,7 @@ def run_compiler(var,mcvar, cflags=""):
             run_string = f"{dirname(var['mcstas'])}/mpicc.bat -DUSE_MPI "
         else:
             run_string = f"mpicc -DUSE_MPI "
-    run_string = run_string + f"-o {var['p_local']/instr_out_file} {var['p_local']/instr_c_file} -lm -g -O2 -std=c99 {cflags}"
+    run_string = run_string + f"-o {var['p_local']/instr_out_file} {var['p_local']/instr_c_file} -lm {var['cflags']}"
     # exectue the run_string and capture the output
     execute(run_string, "An error occurred while running the C Compiler", "C compiler done", verbose=var["verbose"], mpi = var["mpi"])
 
@@ -392,14 +392,6 @@ def save_var_list(var_list, filename):
         w = csv.writer(csvfile)
         for i in range(len(var_list)):
             w.writerow(var_list[i])
-
-#def check_scan(var, mcvar, msg): #ignore for now, is something i might implement later fully
-#    dir_num = len(os.listdir(var['sim_res']/mcvar['sim']))
-#    if dir_num-4 == scan(mcvar).N:
-#        return True
-#    else:
-#        msg = msg + f"the number of result folders dont correspont to the number of steps (#Dir:{dir_num} vs scan.N:{scan(mcvar).N})\n"
-#        return False
 
 def scan_name(mcvar):
     for var_name, var_value in mcvar.items():
